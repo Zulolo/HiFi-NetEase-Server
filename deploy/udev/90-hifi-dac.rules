@@ -1,0 +1,18 @@
+# /etc/udev/rules.d/90-hifi-dac.rules
+# Stable ALSA card ids for the owner's USB DAC dongles (docs/04 §8.1, ADR-0006), plus a
+# hot-plug hook that asks hifid to rescan outputs. Replace the idVendor/idProduct values with
+# the ones printed by `lsusb` / deploy/scripts/probe-dac.sh. Card ids: letters/digits, <= 15 chars.
+#
+# After editing:  sudo udevadm control --reload && replug the dongle; check /proc/asound/cards
+
+# --- Moondrop Dawn Pro (2x CS43131, Comtrue bridge) ---
+SUBSYSTEM=="sound", KERNEL=="card*", ACTION=="add", ATTRS{idVendor}=="2fc6", ATTRS{idProduct}=="f06a", ATTR{id}="DawnPro"
+
+# --- ES9039Q2M dongle (fill in VID:PID; add ATTRS{serial}=="..." if two identical dongles are used) ---
+# SUBSYSTEM=="sound", KERNEL=="card*", ACTION=="add", ATTRS{idVendor}=="20b1", ATTRS{idProduct}=="xxxx", ATTR{id}="ES9039A"
+
+# --- CS43131 dongle with Savitech SA9312L bridge (e.g. JCally JM20 Pro); needs quirk_flags for native DSD ---
+# SUBSYSTEM=="sound", KERNEL=="card*", ACTION=="add", ATTRS{idVendor}=="262a", ATTRS{idProduct}=="xxxx", ATTR{id}="JM20Pro"
+
+# --- Hot-plug notification to hifid for any USB sound card (add or remove) ---
+SUBSYSTEM=="sound", KERNEL=="card*", SUBSYSTEMS=="usb", ACTION=="add|remove", TAG+="systemd", RUN+="/bin/systemctl --no-block start hifid-dac-hotplug@%k.service"

@@ -1,0 +1,17 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- /etc/avahi/services/hifid.service : DNS-SD advertisement (docs/09 §12) -->
+<service-group>
+  <name replace-wildcards="yes">HiFi Server on %h</name>
+  <service>
+    <type>_hifid._tcp</type>
+    <port>8080</port>
+    <txt-record>v=1</txt-record>
+    <txt-record>api=/api/v1</txt-record>
+  </service>
+  <service>
+    <type>_http._tcp</type>
+    <port>8080</port>
+    <txt-record>path=/</txt-record>
+  </service>
+</service-group>

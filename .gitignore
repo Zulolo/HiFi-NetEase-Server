@@ -1,0 +1,17 @@
+# build outputs
+server/dist/
+web/dist/
+web/node_modules/
+android/build/
+android/.gradle/
+
+# local secrets and probe dumps
+*.env
+/etc/
+probe-*.txt
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
