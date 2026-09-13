@@ -1,0 +1,14 @@
+# /etc/systemd/system/srv-data.mount  (bind of /srv/hifi/data)
+[Unit]
+Description=Server data tree (bind mount)
+Requires=srv-hifi.mount
+After=srv-hifi.mount
+
+[Mount]
+What=/srv/hifi/data
+Where=/srv/data
+Type=none
+Options=bind
+
+[Install]
+WantedBy=multi-user.target

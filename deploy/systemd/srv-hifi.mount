@@ -1,0 +1,16 @@
+# /etc/systemd/system/srv-hifi.mount
+# The 512 GB USB disk (ext4, label "hifi") mounted once; /srv/music and /srv/data are bind
+# mounts of its subdirectories (srv-music.mount, srv-data.mount) so both stay on one
+# filesystem and uploads can be finalized with an atomic rename (docs/07 §2.2).
+[Unit]
+Description=HiFi music disk
+Before=mpd.service hifid.service
+
+[Mount]
+What=LABEL=hifi
+Where=/srv/hifi
+Type=ext4
+Options=noatime,nofail,x-systemd.device-timeout=30s
+
+[Install]
+WantedBy=multi-user.target

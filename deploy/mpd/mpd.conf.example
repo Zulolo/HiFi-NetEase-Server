@@ -1,0 +1,120 @@
+# /etc/mpd.conf — HiFi-NetEase-Server template (MPD 0.24.x)
+# Generated sections (audio_output blocks, resampler) will be rendered by hifid from
+# /etc/hifid/config.yaml. Everything else is static. See docs/04 and docs/10.
+
+# ---- paths (all on the USB disk, see docs/03 §7) --------------------------------
+music_directory        "/srv/music"
+playlist_directory     "/srv/music/playlists"
+db_file                "/srv/data/mpd/database"
+state_file             "/srv/data/mpd/state"
+sticker_file           "/srv/data/mpd/sticker.sql"
+log_file               "syslog"                 # journald
+pid_file               "/run/mpd/pid"
+
+user                   "mpd"
+group                  "audio"
+filesystem_charset     "UTF-8"
+auto_update            "no"                     # hifid triggers incremental updates
+restore_paused         "yes"
+zeroconf_enabled       "yes"                    # lets M.A.L.P. discover the server
+zeroconf_name          "HiFi Server"
+
+# ---- network ---------------------------------------------------------------------
+bind_to_address        "/run/mpd/socket"        # hifid
+bind_to_address        "0.0.0.0"                # LAN clients (M.A.L.P., myMPD, mpc)
+port                   "6600"
+max_connections        "20"
+
+# ---- buffers -----------------------------------------------------------------------
+audio_buffer_size      "8192"                   # kB, prebuffer for streams and 24/192
+
+# ---- inputs ------------------------------------------------------------------------
+input {
+    plugin             "curl"
+    verify_peer        "yes"
+    verify_host        "yes"
+    connect_timeout    "10"
+    low_speed_limit    "1024"
+    low_speed_time     "20"
+}
+
+# ---- decoders (keep the audio set, drop the game/module ones) ----------------------
+decoder { plugin "dsf"     enabled "yes" }
+decoder { plugin "dsdiff"  enabled "yes" }
+decoder { plugin "flac"    enabled "yes" }
+decoder { plugin "wavpack" enabled "yes" }
+decoder { plugin "opus"    enabled "yes" }
+decoder { plugin "vorbis"  enabled "yes" }
+decoder { plugin "mad"     enabled "yes" }
+decoder { plugin "ffmpeg"  enabled "yes" }      # ALAC, AAC, APE, AIFF, WAV
+decoder { plugin "sndfile" enabled "no"  }      # ffmpeg covers WAV/AIFF
+decoder { plugin "wildmidi" enabled "no" }
+decoder { plugin "sidplay" enabled "no" }
+decoder { plugin "gme"     enabled "no" }
+decoder { plugin "modplug" enabled "no" }
+decoder { plugin "openmpt" enabled "no" }
+
+# ---- playlist plugins ----------------------------------------------------------------
+playlist_plugin { name "extm3u" enabled "yes" } # NetEase/*.m3u carry #EXTINF
+playlist_plugin { name "m3u"    enabled "yes" }
+playlist_plugin { name "cue"    enabled "yes" }
+
+# ---- bit-perfect defaults ---------------------------------------------------------
+replaygain             "off"
+volume_normalization   "no"
+
+# ==== BEGIN GENERATED (hifid) =======================================================
+# One block per known DAC. Only one is enabled by default; hifid switches with
+# enableoutput/disableoutput. Absent devices are fine while disabled.
+
+resampler {
+    plugin             "soxr"
+    quality            "medium"                 # only used on the rare fallback path
+    threads            "2"
+}
+
+# Example: CS43131 dongle behind a Comtrue bridge (Moondrop Dawn Pro, 2fc6:f06a).
+# Native DSD expected on kernels >= 6.14 (Comtrue vendor quirk); DoP as backup to DSD128.
+audio_output {
+    type               "alsa"
+    name               "Moondrop Dawn Pro"
+    device             "hw:CARD=DawnPro,DEV=0"
+    enabled            "yes"
+    auto_resample      "no"
+    auto_format        "no"
+    auto_channels      "no"
+    buffer_time        "500000"
+    period_time        "100000"
+    dop                "no"                     # hifid sets "yes" if stream0 shows no DSD_U32_BE
+    # PCM rates the device reports, then DSD policy: DoP up to DSD128, PCM fallback at 352.8 k
+    allowed_formats    "44100:*:* 48000:*:* 88200:*:* 96000:*:* 176400:*:* 192000:*:* 352800:*:* 384000:*:* dsd64:*=dop dsd128:*=dop 352800:24:2"
+    mixer_type         "hardware"               # USB feature unit; hifid switches to "none" for DoP if the M0 test fails
+    mixer_device       "hw:CARD=DawnPro"
+    mixer_control      "PCM"
+}
+
+# Example: ES9039Q2M dongle (XMOS or Comtrue bridge). Native DSD to DSD512 expected.
+audio_output {
+    type               "alsa"
+    name               "ES9039Q2M dongle"
+    device             "hw:CARD=ES9039A,DEV=0"
+    enabled            "no"
+    auto_resample      "no"
+    auto_format        "no"
+    auto_channels      "no"
+    buffer_time        "500000"
+    period_time        "100000"
+    dop                "no"
+    allowed_formats    "44100:*:* 48000:*:* 88200:*:* 96000:*:* 176400:*:* 192000:*:* 352800:*:* 384000:*:* 705600:*:* 768000:*:* *:dsd:* 352800:24:2"
+    mixer_type         "none"                   # purist: fixed 100 %, volume on the Acton IV
+}
+
+# Backstop block used only if allowed_formats does not pick the intended fallback rate (R11):
+# audio_output {
+#     type "alsa"  name "DSD fallback (PCM 352.8k)"  device "hw:CARD=DawnPro,DEV=0"  enabled "no"
+#     format "352800:24:2"  auto_resample "no"  auto_format "no"  auto_channels "no"
+# }
+# ==== END GENERATED (hifid) =========================================================
+
+# ==== USER REGION (preserved by hifid) ================================================
+# ==== END USER REGION ==================================================================

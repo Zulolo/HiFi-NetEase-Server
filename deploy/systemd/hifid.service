@@ -1,0 +1,28 @@
+# /etc/systemd/system/hifid.service
+[Unit]
+Description=HiFi-NetEase-Server control service (hifid)
+Documentation=file:///usr/share/doc/hifid/README.md
+After=network-online.target mpd.service srv-music.mount srv-data.mount
+Wants=network-online.target mpd.service
+RequiresMountsFor=/srv/music /srv/data
+
+[Service]
+Type=simple
+User=hifid
+Group=audio
+EnvironmentFile=/etc/hifid/env
+ExecStart=/usr/local/bin/hifid --config /etc/hifid/config.yaml
+Restart=always
+RestartSec=3
+# Hardening (ProtectSystem=strict makes / read-only except the listed paths)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/srv/music /srv/data/hifid /srv/data/incoming /run/hifid
+RuntimeDirectory=hifid
+# mpd.conf regeneration + MPD restart go through hifid-apply-mpd.service (path unit), not this process
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

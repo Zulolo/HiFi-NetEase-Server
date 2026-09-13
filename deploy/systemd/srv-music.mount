@@ -1,0 +1,14 @@
+# /etc/systemd/system/srv-music.mount  (bind of /srv/hifi/music)
+[Unit]
+Description=Music tree (bind mount)
+Requires=srv-hifi.mount
+After=srv-hifi.mount
+
+[Mount]
+What=/srv/hifi/music
+Where=/srv/music
+Type=none
+Options=bind
+
+[Install]
+WantedBy=multi-user.target

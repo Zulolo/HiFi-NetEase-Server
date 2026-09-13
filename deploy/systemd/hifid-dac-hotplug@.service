@@ -1,0 +1,10 @@
+# /etc/systemd/system/hifid-dac-hotplug@.service
+# Started by deploy/udev/90-hifi-dac.rules with the sound card name as the instance (%i = cardN).
+# Tells hifid to re-probe outputs; hifid decides whether an MPD restart is needed (docs/04 §8.3).
+[Unit]
+Description=Notify hifid about USB DAC hot-plug (%i)
+After=hifid.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -fsS -X POST --unix-socket /run/hifid/api.sock http://hifid/api/v1/outputs/rescan
