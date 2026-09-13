@@ -6,15 +6,17 @@ Status: draft v0.1 · 2026-09-13 · addresses FR-3, FR-4.1, NFR-8, C-7
 
 | Path | For | Resumable | Multi-GB | Needs our code |
 |---|---|---|---|---|
-| **Browser upload (tus)** | The required "web page, many files at once" path | Yes | Yes | Yes |
-| **SMB share (samba)** | Bulk drag-and-drop from Windows Explorer, robocopy | OS-level | Yes | No |
+| **SMB share (samba)** — primary | Bulk drag-and-drop from Windows Explorer, robocopy; owner's preferred path | OS-level | Yes | Watcher only |
+| **Browser upload (tus)** — secondary | "Web page, many files at once" from any browser, progress in the PWA | Yes | Yes | Yes |
 | SFTP (OpenSSH + WinSCP) | Scripted or occasional | Client-level | Yes | No |
 | rsync (cwRsync/WSL) | Mirroring a PC folder | Yes | Yes | No |
 | Syncthing | Continuous two-way sync | Yes | Yes | No |
 | WebDAV | Not recommended: Windows' built-in client has a file-size cap (default ≈ 50 MB, max 4 GB) | | | |
 
-Decision (ADR-0004): tus in the PWA is the primary path; samba is installed by the deployment
-script as the bulk alternative. Both write into the same tree and trigger the same scan.
+Decision (ADR-0004, revised): Samba is installed by default and is the primary import path,
+with an inotify watcher in `hifid` that triggers incremental MPD updates; the tus browser
+upload is the secondary path, built after Samba is live. Both write into the same tree and
+trigger the same scan. Over the owner's Wi-Fi link both run at 10–25 MB/s.
 
 ## 2. Browser upload design (FR-3.1, FR-3.2)
 
@@ -60,10 +62,10 @@ complete    -> hifid hook:
 See docs/05 §7: ≈ 35 MB/s on the Zero 3 (USB 2.0 disk bound), ≈ 100 MB/s on the RV with an
 SSD. SHA-256 on the server costs ≈ 10–20 % of one A53 core at 35 MB/s.
 
-## 3. SMB share (FR-3.4)
+## 3. SMB share (FR-3.1, primary path)
 
-`deploy/scripts/install.sh --with-samba` installs `samba` (Debian arm64 and riscv64) with one
-share:
+`deploy/scripts/install.sh` installs `samba` (Debian arm64 and riscv64) by default with one
+share; `--without-samba` skips it:
 
 ```
 [music]

@@ -120,6 +120,22 @@ Platform requirements to plan for:
 
 ## 6. DLNA side path (official NetEase app as controller)
 
+**What DLNA is.** DLNA (Digital Living Network Alliance, built on UPnP AV) is the standard
+that lets an app on your phone "cast" to a player box on the same Wi-Fi: the phone acts as
+the *controller*, the box is the *renderer*. The phone sends "play this URL" plus
+play/pause/next/volume commands; the renderer fetches the audio itself and plays it. It is
+the same mechanism Xiaomi speakers and many TVs use.
+
+**How it helps here.** The official 网易云音乐 Android app has a cast button (投射到设备) that
+lists DLNA renderers on the LAN. If the server runs `upmpdcli`, MPD appears in that list, and
+the official app becomes a remote control for the server immediately: browse and search in
+the app you already know, tap cast, and the sound comes out of the ES9039Q2M dongle through
+MPD's normal bit-perfect path. No server-side login, no custom code, and the DAC selection
+made in the PWA still applies. It is a convenient extra for guests and for the first week
+before `hifid` exists, not a replacement: the phone must stay on the LAN, the quality is what
+the app chooses (a 2024 report shows 96 kHz streams arriving this way), and there is no
+download, no local library and no format badge.
+
 - `upmpdcli` turns MPD into a UPnP AV / OpenHome renderer (1.9.x, GPL-2, vendor apt repo for
   Debian arm64; build from source on riscv64). It shares MPD's outputs, so the DAC selection
   made in the PWA applies to casts as well.

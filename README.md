@@ -15,7 +15,7 @@ No application code yet; see [docs/11](docs/11-roadmap-and-milestones.md) for th
 |---|---|
 | NetEase Cloud Music on ARM/RISC-V Linux, logged in with my account | `hifid` NetEase adapter (Go, QR login) feeding MPD through a local stream proxy; downloads with tags |
 | Remote control from my phone (select, play, stop, volume, next, download) | Mobile PWA served by `hifid`; M.A.L.P. and any MPD client also work |
-| Upload local music from my PC over the LAN, many files at once | Resumable tus uploads in the PWA (multi-GB safe); optional Samba share |
+| Import local music from my PC over the LAN, many files at once | Samba share for Explorer drag-and-drop (primary, auto-scanned); resumable tus uploads in the PWA (secondary, multi-GB safe) |
 | All common formats plus DSD, hardware first, software fallback | MPD: native DSD → DoP → DSD-to-PCM, bit-perfect PCM via ALSA `hw:` |
 | Choose which DAC/channel plays | MPD output blocks per DAC, udev-stable names, switch from the phone, hot-plug |
 
@@ -32,18 +32,22 @@ tools/         bench scripts to fill the measurement tables in docs/05
 
 ## Hardware (owner's setup)
 
-- Orange Pi Zero 3 (Allwinner H618, arm64) — primary target; Orange Pi RV (StarFive JH7110, riscv64) — second target
-- 64 GB microSD for the OS, 512 GB USB disk for music
-- USB-C/USB-A to 3.5 mm DAC dongles based on ES9039Q2M and CS43131
+- Orange Pi RV (StarFive JH7110, riscv64, Wi-Fi via Broadcom AP6256) — deployment board; Orange Pi Zero LTS (Allwinner H3, 512 MB) — usable only with a mainline-driver USB Wi-Fi adapter or Ethernet, decided by the M0 bake-off (ADR-0007)
+- Wi-Fi only at the speaker's location (no Ethernet)
+- 64 GB microSD for the OS, 512 GB USB flash drive for music
+- USB-C/USB-A to 3.5 mm DAC dongles based on ES9039Q2M (default output) and CS43131; DSD library up to DSD256
 - Marshall Acton IV (AUX 3.5 mm / RCA analog inputs)
+- NetEase Cloud Music SVIP account (unlocks 超清母带 `jymaster` quality)
 
 ## Next step
 
-Milestone M0 (bench verification, no custom code): flash Armbian Debian 13 on the Zero 3,
-install `mpd`, run `deploy/scripts/probe-dac.sh` on every dongle, and fill the DAC matrix in
-[docs/04 §7](docs/04-audio-pipeline-dsd-dac.md). Open questions for the owner are listed in
-[docs/12 §2](docs/12-risks-and-open-questions.md).
+Milestone M0 (bench verification, no custom code): install Debian 13 on the Orange Pi RV (and
+on the small board once its model is confirmed), install `mpd`, run
+`deploy/scripts/probe-dac.sh` on every dongle, fill the DAC matrix in
+[docs/04 §7](docs/04-audio-pipeline-dsd-dac.md), and run the Wi-Fi/USB-audio bake-off of
+[ADR-0007](docs/adr/0007-primary-target-board.md). Remaining questions for the owner are in
+[docs/12 §2](docs/12-risks-and-open-questions.md) (Q11–Q13).
 
 ## Licence
 
-Proposed: MIT (compatible with all selected libraries). To be confirmed by the owner.
+MIT, see [LICENSE](LICENSE).

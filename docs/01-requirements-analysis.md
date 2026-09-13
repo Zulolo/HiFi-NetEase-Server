@@ -13,14 +13,14 @@ evaluation) refer back to the requirement IDs defined here (FR-x, NFR-x, C-x).
 |------|-------|
 | Speaker | Marshall Acton IV. Inputs: 3.5 mm AUX (analog), RCA (analog), Bluetooth 5.3 (SBC/AAC/LDAC/LC3). No USB, no S/PDIF, no HDMI, no Wi-Fi. |
 | Connection to speaker | 3.5 mm AUX cable from a USB DAC dongle. |
-| Server board candidates | Orange Pi Zero 3 (Allwinner H618, arm64) and Orange Pi RV (RISC-V). Both run Debian. |
+| Server board candidates | Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB) and Orange Pi Zero LTS (Allwinner H3, armhf, 512 MB, XR819 Wi-Fi). Both run Debian server images. Larger boards (including a Raspberry Pi 5) exist but the owner prefers a low-power board. |
 | OS storage | 64 GB microSD (TF) card. |
-| Music storage | 512 GB USB disk. |
-| DACs | Several "USB-C/USB-A to 3.5 mm" HiFi dongles, mostly ES9039Q2M- or CS43131-based, with different USB bridge chips. |
-| Music source 1 | 网易云音乐 (NetEase Cloud Music) account with a large saved library (playlists, liked songs, possibly 云盘 cloud disk). |
-| Music source 2 | Local files on a Windows PC, to be imported over the LAN. |
-| Controller | A mobile phone (Android assumed; iOS should not be excluded) on the same Wi-Fi/LAN. |
-| Network | Home LAN. No requirement for access from the internet. |
+| Music storage | 512 GB USB flash drive. |
+| DACs | Several "USB-C/USB-A to 3.5 mm" HiFi dongles, ES9039Q2M-based (preferred, default output) and CS43131-based, with different USB bridge chips. |
+| Music source 1 | 网易云音乐 (NetEase Cloud Music) **SVIP** account with a large saved library (playlists, liked songs, possibly 云盘 cloud disk). |
+| Music source 2 | Local files on a Windows PC, to be imported over the LAN; DSD material is DSD256 or lower. |
+| Controller | An Android phone (primary); iOS should not be excluded. |
+| Network | Home LAN reached over **Wi-Fi only** at the speaker's location (no Ethernet). No requirement for access from the internet. |
 
 ## 2. Demands, interpretation, and acceptance criteria
 
@@ -75,10 +75,10 @@ All FR-2.1 to FR-2.5 actions are reachable in at most 2 taps from the now-playin
 
 | ID | Requirement |
 |----|-------------|
-| FR-3.1 | Browser upload of many files at once (multi-select and drag-and-drop of folders), optionally preserving folder structure. |
+| FR-3.1 | Primary path (owner's choice): an SMB share that Windows Explorer can drag folders onto; new files are detected and scanned automatically. Secondary path: browser upload of many files at once (multi-select and drag-and-drop of folders), optionally preserving folder structure. |
 | FR-3.2 | Large files (a single DSD256 track can exceed 1 GB; an album 3 to 6 GB) must upload reliably; interrupted uploads resume rather than restart. |
 | FR-3.3 | Uploaded files land on the 512 GB USB disk, are scanned into the library automatically, and appear in the phone UI without manual steps. |
-| FR-3.4 | Alternative zero-UI import paths are documented and optionally enabled: SMB share (Windows Explorer drag-and-drop), SFTP/rsync. |
+| FR-3.4 | Other zero-UI import paths (SFTP, rsync, Syncthing) are documented but not installed by default. |
 | FR-3.5 | Duplicate detection (same path or same audio hash) at least warns. |
 
 **Acceptance.** Drag a 4 GB folder of DSF files onto the web page from Windows; all files
@@ -137,8 +137,10 @@ own analog jack) may be attached at once; the user picks the active one from the
 | C-1 | Official NetEase client is closed source and desktop-only. | Use an open-source API implementation; keep the NetEase adapter isolated behind an interface so it can be swapped when the API changes. |
 | C-2 | NetEase stream URLs expire (minutes) and depend on account entitlement (VIP for lossless/Hi-Res on many tracks). | The playback engine must never hold raw CDN URLs in its queue; resolve lazily through a local proxy. |
 | C-3 | Unofficial API use is against NetEase ToS in spirit; endpoints change without notice. | Personal, single-account, LAN-only use; no redistribution; expect maintenance. Documented in 12-risks. |
-| C-4 | Two target architectures: arm64 (Zero 3) and riscv64 (RV). | Prefer components packaged in Debian for both, and Go for custom code (trivial cross-compilation, no runtime). Avoid Electron/Node/Chromium on the server. |
-| C-5 | Smallest board has 1 GB RAM and USB 2.0 only. | RAM budget ≤ 300 MB for all our services; USB 2.0 is sufficient for audio (see doc 05). |
+| C-4 | Target architectures: riscv64 (RV) first, armhf (Zero LTS) and arm64 kept. | Prefer components packaged in Debian for all three, and Go for custom code (trivial cross-compilation, no runtime). Avoid Electron/Node/Chromium on the server. |
+| C-5 | The Zero LTS has 512 MB RAM, a Cortex-A7 CPU and USB 2.0 only. | RAM budget ≤ 300 MB for all our services including Samba; no optional extras on that board; no software DSD conversion there; USB 2.0 is sufficient for audio (see doc 05). |
+| C-9 | Wi-Fi is the only network link. | Wi-Fi driver maturity is a board-selection criterion; power save off; larger stream buffers; imports over Wi-Fi run at 10–25 MB/s. |
+| C-10 | Music storage is a USB flash drive. | Sustained writes 10–30 MB/s; keep database/index writes small; verify genuine capacity before use. |
 | C-6 | Acton IV inputs are analog; it digitizes AUX internally for its DSP. | The audible ceiling is set by the speaker's ADC/DSP. The chain is still built bit-perfect up to the DAC, but ultra-high rates (≥ 384 kHz, DSD512) bring no audible gain on this speaker. |
 | C-7 | OS on a microSD card. | Keep write-heavy data (library DB, caches, downloads, logs) on the USB disk; keep the card mostly read-only in spirit. |
 | C-8 | Headless, no display attached. | All administration via web UI/SSH; QR login rendered in the web UI. |

@@ -88,8 +88,10 @@ NetEase `song/url/v1` takes a `level`. Values and what they mean for a HiFi serv
 
 Rules:
 
-1. Preference order is configurable; default `hires > lossless > exhigh > higher > standard`;
-   `jymaster` can be put on top by the owner if the account has SVIP.
+1. Preference order is configurable. The owner's account is SVIP, so the default is
+   `jymaster > hires > lossless > exhigh > higher > standard`. `jymaster` (超清母带) is a
+   stereo master-quality FLAC rather than a DSP effect, so it belongs in the ladder; the
+   effect variants (`jyeffect`, `sky`, `dolby`, `vivid`) stay excluded.
 2. The response tells the level actually granted; the adapter records it and the UI shows it
    (FR-4.6 badge "NetEase FLAC 24/96").
 3. Entitlement is known before asking for a URL: the song's `privilege` object carries

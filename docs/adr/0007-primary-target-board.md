@@ -1,33 +1,54 @@
-# ADR-0007 · Orange Pi Zero 3 (Armbian Debian 13) is the primary target; Orange Pi RV is the second target
+# ADR-0007 · Target board: Orange Pi RV (JH7110) for deployment; Orange Pi Zero LTS only with a Wi-Fi fix
 
-- Status: accepted (pending owner confirmation of the exact RV model, Q1)
+- Status: accepted (revised 2026-09-13 after the owner confirmed the boards)
 - Date: 2026-09-13
-- Requirements addressed: C-4, C-5, NFR-1, NFR-4
+- Requirements addressed: C-4, C-5, C-9, NFR-1, NFR-4
 
 ## Context
 
-The owner has an Orange Pi Zero 3 (Allwinner H618, arm64) and an Orange Pi RV (StarFive
-JH7110, riscv64; the RV2 is a different Ky X1 board). Evaluation and scoring in docs/05 §1.
+The owner has an Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB, 4× USB 3.0, Broadcom
+AP6256 Wi-Fi) and an Orange Pi Zero LTS (Allwinner H3, 4× Cortex-A7, 512 MB, one USB
+Type-A plus header ports, XR819 Wi-Fi: 2.4 GHz only, out-of-tree driver, widely reported
+unstable). Larger boards including a Raspberry Pi 5 are available but the owner prefers a
+low-power board, reasoning that the DAC adapter does most of the work. **Wi-Fi is the only
+network link**, the disk is a USB flash drive, Samba is the primary import path, and the
+ES9039Q2M dongle is the default output. Evaluation and scoring in docs/05 §1.
+
+The owner's reasoning is right about the CPU: the DAC does the D/A conversion, native DSD is
+pass-through, and FLAC decoding costs the H3 10–20 % of one core. It is not right about the
+network: the server streams NetEase, serves Samba copies and talks to the phone only through
+Wi-Fi, and the XR819 is the least reliable part of any board in the house.
 
 ## Options considered
 
 | Option | Pros | Cons |
 |---|---|---|
-| **Zero 3 primary** | Plain EHCI host ports (no hub), Armbian Debian 13 with Linux 6.18 (fresh DSD quirk table), every needed package on arm64 including myMPD/upmpdcli, ≈ 1 W idle, owner has it | USB 2.0 only, one Type-A (expansion board or powered hub needed), undocumented VBUS budget, 1 GB variant is tight |
-| RV (JH7110) primary | 4× USB 3.0, 5 V/4 A supply, more RAM, Debian riscv64 official, mainline DTB in 6.19 | No Armbian; kernel/DTB path needs care; VL805 firmware version unverified for isochronous fixes; ≈ 3–4 W idle; myMPD/upmpdcli from source |
-| RV2 (Ky X1) | 8 cores, USB 3.0 | USB 2.0 mainline support still in review; vendor kernel bug; hub in front of USB 3.0 |
-| Buy a Raspberry Pi 4 | Best-proven USB audio host | Not owned; price increases in 2026 |
+| **Orange Pi RV as deployment board** | Mainline Broadcom Wi-Fi (`brcmfmac`), 5 GHz; 2–8 GB RAM; 4× USB 3.0 (flash drive + two DACs, no hub); 5 V/4 A supply; Debian 13 riscv64 official; board DTB in mainline 6.19 | No Armbian; vendor image versions unverified; VL805 isochronous behaviour depends on firmware (Pi 4 history); ≈ 3–4 W idle; myMPD/upmpdcli from source; no SIMD for the (unneeded) software DSD path; power-button boot quirk to check |
+| Orange Pi Zero LTS as-is | ≈ 1 W idle, owner's preference for a small board | XR819 Wi-Fi is a hard blocker for a Wi-Fi-only server (2.4 GHz only, ≈ 10–20 Mbps at best, disconnects); 512 MB leaves ≈ 150–300 MB free; micro-USB 2 A input marginal with three USB devices |
+| Orange Pi Zero LTS + USB Wi-Fi adapter with a mainline driver (MediaTek MT7612U / MT7921AU, `mt76`) or Ethernet | Keeps the small, low-power board; mainline Wi-Fi on 5 GHz; CPU is sufficient | Needs the 13-pin expansion board (or a hub) for disk + DAC + Wi-Fi on one USB 2.0 root; 512 MB stays tight; armhf 32-bit build target; more cables than the RV |
+| Raspberry Pi 5 | Most trouble-free USB audio host, mainline Wi-Fi, packages for everything | Over-specified for the task; ≈ 2.5–3 W idle (close to the RV anyway); owner prefers not to use it |
 
 ## Decision
 
-Develop and verify on the Zero 3 with Armbian's Debian 13 minimal image (6.18 kernel), 2 GB
-or 4 GB variant preferred. Build every artifact for riscv64 as well and validate on the RV in
-M5; choose the RV as the deployment chassis if the disk is a spinning HDD or if more than two
-USB devices are needed. Nothing in the software is arm64-specific.
+Deploy on the Orange Pi RV. Build every artifact for riscv64 first and keep arm64 and armhf
+builds (`GOARCH=arm GOARM=7`) so the Zero LTS remains usable. If the owner wants to try the
+Zero LTS, it enters the M0 bake-off **only with a mainline-driver USB Wi-Fi adapter or
+Ethernet**, under the same pass criteria:
+
+1. 24 h Wi-Fi stability (no disconnects, ≤ 1 % packet loss, ≥ 20 Mbps sustained on 5 GHz)
+   with power save off.
+2. 24 h USB-DAC playback at 24/192 and DSD128/256 without xruns while Samba copies run.
+3. Native DSD offered for the ES9039Q2M dongle (`DSD_U32_BE` in `stream0`), else DoP256.
+4. RAM headroom ≥ 100 MB with MPD, `hifid`, Samba and Avahi running.
+
+The RV is the default if it passes; the Zero LTS replaces it only if it also passes and the
+owner prefers it. The Raspberry Pi 5 is the fallback if neither passes.
 
 ## Consequences
 
-- Install script and units must be architecture-neutral; CI builds both binaries.
-- Zero 3 setup needs a powered hub or self-powered SSD and a 5 V/3 A PSU (docs/05 §1.2, §8).
-- If the owner's board is actually an RV2, the riscv64 secondary target shifts to Armbian's
-  community image for it; the decision does not change.
+- Install script, units and binaries stay architecture-neutral; CI builds riscv64, arm64 and armhf.
+- The RV needs a verified Debian 13 image path (vendor image, or Debian riscv64 with the
+  board DTB) documented in docs/10 §1 during M0, plus the always-on/power-button check.
+- Zero LTS extras: 13-pin expansion board, a `mt76` USB Wi-Fi adapter (≈ 15–20 USD), zram
+  swap, no myMPD/upmpdcli, MPD buffer 8 MB.
+- Idle power of the RV (≈ 3–4 W) is accepted for a device that plays music most of the day.
