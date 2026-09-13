@@ -7,56 +7,76 @@ hardware" is filled in during milestone M0 (docs/11) with `tools/bench` results.
 
 ## 1. Candidate boards
 
-The project owner has an Orange Pi Zero 3 and an "Orange Pi RV". Two different RISC-V
-boards carry the RV name, so both are listed; confirm which one is on the bench.
+The project owner has an **Orange Pi Zero LTS** (confirmed: Allwinner H3, 512 MB) and an
+**Orange Pi RV** (confirmed: StarFive JH7110), plus larger boards including a Raspberry Pi 5
+that the owner would rather not use for such a simple task. The RV2 is listed for reference
+only.
 
-| | Orange Pi Zero 3 | Orange Pi RV | Orange Pi RV2 |
+| | Orange Pi Zero LTS (owned) | Orange Pi RV (owned) | Raspberry Pi 5 (owned, reference) | Orange Pi RV2 (reference) |
+|---|---|---|---|---|
+| SoC | Allwinner H3, 4× Cortex-A7 @ 1.0–1.2 GHz (32-bit armhf) | StarFive JH7110, 4× SiFive U74 @ 1.5 GHz (riscv64) | BCM2712, 4× Cortex-A76 @ 2.4 GHz (arm64) | Ky X1, 8× RV64GCV @ 1.6 GHz |
+| RAM | 512 MB DDR3 | 2 / 4 / 8 GB LPDDR4 | 2 / 4 / 8 / 16 GB | 2 / 4 / 8 GB |
+| Storage | microSD, SPI flash | microSD, SPI, M.2 PCIe 2.0 ×1 | microSD, PCIe (HAT) | microSD, eMMC, 2× M.2 |
+| USB | 1× USB 2.0 Type-A; 2× USB 2.0 on 13-pin header (expansion board); micro-USB OTG (power) | 4× USB 3.0 Type-A via VL805 xHCI (Pi 4 class) | 2× USB 3.0 + 2× USB 2.0 (RP1) | 3× USB 3.0 via hub, 1× USB 2.0 |
+| Ethernet | 10/100 Mbps | 1× GbE | 1× GbE | 2× GbE |
+| Wi-Fi | **XR819, 802.11n, 2.4 GHz only, out-of-tree driver, widely reported unstable** | Wi-Fi 5 + BT 5.0, Broadcom AP6256 (mainline `brcmfmac`) | Wi-Fi 5 + BT 5.0, Broadcom CYW43455 (`brcmfmac`) | Wi-Fi 5 (AP6256) |
+| Power input | micro-USB 5 V / 2 A | USB-C 5 V / 4 A | USB-C 5 V / 5 A (PD) | USB-C 5 V / 5 A |
+| Idle power | ≈ 1–1.5 W | ≈ 3.4–4.2 W (VisionFive 2, same SoC) | ≈ 2.5–3 W | ≈ 1.5–3 W |
+| Kernel status | H3 well supported in mainline; Armbian community/legacy images; Debian armhf packages | Board DT in Linux 6.19; Debian 13 riscv64 official; vendor Debian image | Raspberry Pi OS / Debian arm64, 6.12 kernel, best-documented USB audio host | Vendor 6.6 or Armbian community 6.18 |
+| Packages (Debian 13) | mpd, ffmpeg, samba, avahi, golang: present on armhf; Go cross-build with `GOARCH=arm GOARM=7` | All present on riscv64; myMPD/upmpdcli from source | Everything, including myMPD and upmpdcli packages | Same as RV |
+| Price (USD) | 10–15 | 30–50 | 60–120 | 30–50 |
+
+Sources are listed in docs/02 §7 and in the Armbian/Orange Pi community threads on the
+XR819 driver. The "adapter does most of the work" intuition is correct for the D/A
+conversion and for native DSD (pure pass-through), but the board still decodes FLAC/MP3,
+runs the NetEase service, Samba and the Wi-Fi stack; on the H3 those are all light. The
+CPU is not the constraint. Wi-Fi quality and RAM are.
+
+### 1.1 Decision matrix (weight 1–5), revised after the owner's answers
+
+New inputs: Wi-Fi is the only network link (C-9), the disk is a flash drive (C-10), the
+small board is an Orange Pi Zero LTS (H3, 512 MB).
+
+| Criterion (weight) | Orange Pi Zero LTS | RV (JH7110) | Raspberry Pi 5 (reference) |
 |---|---|---|---|
-| SoC | Allwinner H618, 4× Cortex-A53 @ 1.5 GHz (arm64) | StarFive JH7110, 4× SiFive U74 @ 1.5 GHz (riscv64) | Ky X1 (SpacemiT K1 family), 8× RV64GCV @ 1.6 GHz (riscv64) |
-| RAM | 1 / 1.5 / 2 / 4 GB LPDDR4 | 2 / 4 / 8 GB LPDDR4 | 2 / 4 / 8 GB LPDDR4X |
-| Storage | microSD, SPI flash | microSD, SPI, M.2 M-key PCIe 2.0 ×1 (NVMe) | microSD, optional eMMC, 2× M.2 M-key |
-| USB | 1× USB 2.0 Type-A; 2× USB 2.0 on 13-pin header (expansion board); USB-C power/OTG | 4× USB 3.0 Type-A via one VL805 PCIe xHCI (same controller family as Raspberry Pi 4) | 3× USB 3.0 via GL3523 hub on one DWC3; 1× USB 2.0 Type-A; USB 2.0 header |
-| Ethernet | 1× GbE | 1× GbE | 2× GbE |
-| Wi-Fi / BT | Wi-Fi 5 + BT 5.0 | Wi-Fi 5 + BT 5.0 | Wi-Fi 5 + BT 5.0 |
-| Power input | USB-C 5 V / 3 A | USB-C 5 V / 4 A | USB-C 5 V / 5 A |
-| Idle power | ≈ 0.8 W bare, ≈ 2 W with peripherals | ≈ 3.4–4.2 W (VisionFive 2, same SoC) | ≈ 1.5–3 W |
-| Kernel status | Mainline DT since 2023; Armbian community image, Debian 13 + Linux 6.18 (USB, GbE, Wi-Fi OK) | Board DT merged in Linux 6.19; Debian 13 riscv64 is an official release arch; no Armbian | Vendor 6.6 kernel (known CPU-hog bug) or Armbian community 6.18; USB 2.0 mainline support still in review |
-| Packages (Debian 13) | mpd 0.24, mpc, ffmpeg 7.1, samba, nginx, avahi, golang 1.24, nodejs 20: all present; myMPD (OBS deb) and upmpdcli (vendor apt) available | Same Debian packages present on riscv64; **myMPD and upmpdcli: build from source only** | Same as RV |
-| Price (USD) | 15–25 | 30–50 | 30–50 |
-
-Sources are listed in docs/02 §7. Board wiki pages were unreachable during the survey; the
-USB VBUS current limit of the Zero 3 could not be verified and is treated as "assume
-≤ 1 A total, use a powered hub or self-powered disk".
-
-### 1.1 Decision matrix (weight 1–5)
-
-| Criterion (weight) | Zero 3 | RV (JH7110) | RV2 (Ky X1) |
-|---|---|---|---|
-| USB audio path maturity (5) | 5 · plain EHCI per port, no hub, arm64 snd-usb-audio widely used | 4 · VL805 xHCI (well known from Pi 4, isochronous firmware fixes exist; EEPROM version unverified) | 2 · hub on one DWC3, USB 2.0 support still landing |
-| Kernel freshness for DSD quirks (4) | 5 · 6.18 via Armbian | 4 · 6.19 mainline (self-built) or Debian 6.12 + own DTB | 3 |
-| Package availability (4) | 5 | 3 · myMPD/upmpdcli from source | 3 |
-| Ports and power for disk + 2 DACs (3) | 2 · needs expansion board or powered hub | 5 · 4× USB 3.0, 4 A supply | 4 |
+| USB audio path maturity (5) | 3 · H3 EHCI is fine, but one Type-A plus header ports; flash drive and DAC share one USB 2.0 root | 4 · VL805 xHCI (Pi 4 class; isochronous firmware fixes exist, EEPROM version unverified) | 5 · RP1 xHCI, the most-used USB DAC host in the hobby |
+| Kernel freshness for DSD quirks (4) | 4 · mainline supports H3 well | 4 · Debian 6.12 + board DTB, or 6.19 mainline | 5 · 6.12 Raspberry Pi kernel |
+| Package availability (3) | 4 · armhf | 4 · baseline all present; myMPD/upmpdcli from source | 5 |
+| Ports and power for flash drive + 2 DACs (3) | 2 · expansion board or hub, micro-USB 2 A input | 5 · 4× USB 3.0, 4 A supply | 5 |
+| **Wi-Fi driver maturity (4)** | 1 · XR819: 2.4 GHz only, out-of-tree, unstable | 4 · Broadcom AP6256 via mainline `brcmfmac` | 5 · Broadcom CYW43455 via `brcmfmac` |
+| RAM headroom (3) | 1 · 512 MB | 5 · 2–8 GB | 5 |
 | Idle power (2) | 5 | 2 | 3 |
-| RAM headroom (2) | 3 · 1–4 GB | 4 | 4 |
-| Owner already has it (3) | 5 | 5 | ? |
-| **Weighted score** | **101 / 115** | **88 / 115** | 68 / 115 |
+| Owner already has it (3) | 5 | 5 | 5 |
+| **Weighted score** | **81 / 135** | **113 / 135** | 129 / 135 |
 
-**Decision (ADR-0007):** Orange Pi Zero 3 is the primary target and the M0 bench board.
-The Orange Pi RV is the second target: the same software is built for riscv64, and the RV is
-the better chassis if the 512 GB disk is a spinning HDD or if more than two USB devices are
-needed. Nothing in the design is arm64-specific.
+**Decision (ADR-0007, revised):** the Orange Pi RV is the intended deployment board. The
+Zero LTS is kept as an option only if its Wi-Fi problem is removed: a USB Wi-Fi adapter with
+a mainline driver (MediaTek MT7612U or MT7921AU, `mt76`, both 5 GHz capable) or Ethernet.
+The Raspberry Pi 5 would be the most trouble-free host but is over-specified for the task;
+it stays a reference, not a target. The M0 bake-off (24 h Wi-Fi stability, 24 h USB-DAC
+playback during Samba copies, native DSD availability, RAM headroom) decides between the RV
+and a Zero LTS with a USB Wi-Fi adapter, if the owner wants to try the latter. Nothing in the
+design is architecture-specific.
 
-### 1.2 Zero 3 physical setup
+### 1.2 Physical setup
 
 ```
-USB-C 5 V/3 A PSU ──> Zero 3
-Type-A ──> powered USB 2.0 hub ──> 512 GB disk (or self-powered SSD)
-                              └──> DAC #1 (ES9039Q2M)
-13-pin header expansion board ──> DAC #2 (CS43131)      (optional second output)
-GbE ──> router  (Wi-Fi only as fallback; not for uploads)
+Orange Pi RV:   USB-C 5 V/4 A PSU ──> RV
+                USB 3.0 #1 ──> 512 GB USB flash drive
+                USB 3.0 #2 ──> DAC #1 (ES9039Q2M, default output)  ──> 3.5 mm ──> Acton IV AUX
+                USB 3.0 #3 ──> DAC #2 (CS43131, optional)
+                Wi-Fi 5 (5 GHz) ──> router   (power save off; no Ethernet at this location)
+
+Zero LTS (only with the Wi-Fi fix):
+                micro-USB 5 V/2 A PSU ──> Zero LTS
+                Type-A ──> DAC #1 (ES9039Q2M)
+                13-pin expansion board USB ×2 ──> flash drive, USB Wi-Fi adapter (mt76)
+                (all three share one USB 2.0 root: 20 Mbps Wi-Fi + 10 Mbps disk + 23 Mbps DSD256 is still far below the bus limit)
 ```
 
-If the disk is a bus-powered 2.5" HDD (spin-up ≈ 1 A), the powered hub is mandatory.
+A flash drive (≈ 100 mA) plus one dongle (≈ 100–250 mA) stays well inside any of the boards'
+USB budgets, so no powered hub is needed. Check the flash drive once with `f3probe` (fake
+capacity is common on large cheap sticks) and format it ext4 with `-m 1`.
 
 ## 2. Audio data rates
 
@@ -102,7 +122,11 @@ speeds up uploads.
 
 ## 4. Storage plan (512 GB disk)
 
-Usable after ext4 formatting with reserved blocks set to 1 %: ≈ 500 GB.
+Usable after ext4 formatting with reserved blocks set to 1 %: ≈ 500 GB. The drive is a USB
+flash stick (C-10): expect 10–30 MB/s sustained writes (some sticks drop to 5 MB/s once their
+SLC cache is full or they heat up), 100+ MB/s reads; mount with `noatime,commit=60`; keep the
+SQLite index and MPD database small and rarely rewritten; a USB SSD is the upgrade path if
+import speed matters later.
 
 | Content type | Assumed size | Capacity if used alone |
 |---|---|---|
@@ -125,11 +149,17 @@ Suggested layout for a mixed library:
 The 64 GB microSD holds only the OS (≈ 3 GB used). Journald is capped at 200 MB and MPD's
 database, state and sticker files live on the USB disk (C-7).
 
-## 5. CPU budget (Cortex-A53 @ 1.5 GHz, four cores)
+## 5. CPU budget (Cortex-A53 @ 1.5 GHz, four cores; H3 and JH7110 notes below)
 
 MPD uses at least two threads: the decoder thread (codec + format conversion) and the
 output thread (ALSA writes, DoP packing, output-side conversion). They run on different
 cores, so the figures below are per-core percentages.
+
+For the owner's boards: the Zero LTS's Cortex-A7 @ 1.0 GHz is roughly 2–3× slower than an
+A53 @ 1.5 GHz per core, so multiply the decode rows by ≈ 2.5 (FLAC 24/192 ≈ 10–20 % of a core,
+still fine) and treat every software DSD conversion row as **not feasible**; the JH7110's U74
+is comparable to an A53 for integer decode but has no SIMD unit, so the DSD conversion rows
+are worse there too. With the ES9039Q2M dongle doing native DSD, neither board needs them.
 
 | Task | Estimate | Basis |
 |---|---|---|
@@ -161,48 +191,55 @@ Mitigations for the expensive case (designed in docs/04):
    converting in real time.
 3. Use `libsamplerate` "Medium" or `soxr` "quick" for the real-time fallback path only.
 
-## 6. RAM budget (1 GB board)
+## 6. RAM budget
 
 | Component | RSS estimate |
 |---|---|
-| Debian 13 minimal (Armbian, no desktop) | 90–140 MB |
-| MPD 0.24 with a 20,000-song database, 4 MB audio buffer | 40–80 MB |
+| Debian 13 minimal server image (no desktop) | 90–140 MB |
+| MPD 0.24 with a 20,000-song database, 16 MB audio buffer | 50–90 MB |
 | `hifid` (Go, embedded PWA, SQLite index, caches) | 30–60 MB |
 | avahi-daemon | 3–5 MB |
-| samba (optional, idle) | 20–40 MB |
+| samba (default, idle; +10–20 MB per active copy session) | 20–40 MB |
 | upmpdcli (optional) | 15–25 MB |
-| **Total worst case** | **≈ 350 MB** |
+| **Total, baseline (no upmpdcli)** | **≈ 195–335 MB** |
 
-Remaining ≈ 600 MB is page cache for the music files (helps gapless and re-reads). A 2 GB
-Zero 3 or the RV removes any pressure. Node.js-based NetEase API sidecars would add
-120–200 MB and are avoided in the baseline (ADR-0002).
+- On the **RV (2–8 GB)** there is no pressure; the rest is page cache for music files.
+- On the **Zero LTS (512 MB)** the baseline fits with ≈ 150–300 MB left, of which the kernel needs
+  ≈ 50 MB and page cache gets the remainder. It works for playback (a 24/192 FLAC needs only
+  1.2 MB/s of reads) but: no myMPD, no Node.js, `zram` swap enabled as a safety net, MPD
+  `audio_buffer_size` back to 8 MB, and Samba copies during DSD playback should be tested in
+  M0 (a large copy fills the page cache and evicts MPD's read-ahead).
+- Node.js-based NetEase API sidecars would add 120–200 MB and are avoided (ADR-0002).
 
 ## 7. Network
 
 | Flow | Rate | Comment |
 |---|---|---|
-| NetEase streaming (lossless/hires) | 1–5 Mbps down | trivial for any home internet |
+| NetEase streaming (lossless/hires/jymaster) | 1–9 Mbps down over Wi-Fi | trivial bandwidth; Wi-Fi latency spikes are absorbed by MPD's 16 MB buffer (≈ 30 s at 24/96) |
 | PWA control traffic | < 10 kbps | WebSocket state events |
-| Upload PC → board over GbE | ≈ 110 MB/s theoretical | bottleneck is the USB 2.0 disk at ≈ 35 MB/s on the Zero 3, ≈ 100 MB/s on the RV with an SSD |
-| Upload over Wi-Fi 5 | 10–25 MB/s typical | acceptable for single albums, avoid for bulk |
+| Samba or upload, PC → board over Wi-Fi 5 (5 GHz, good signal) | 10–25 MB/s typical | comparable to the flash drive's write speed, so neither dominates |
+| Same over 2.4 GHz or weak signal | 3–10 MB/s | plan bulk imports near the router or move the board temporarily |
+| Ethernet (not available at the speaker) | ≈ 110 MB/s | would be limited by the flash drive at 10–30 MB/s anyway |
 
-Upload time for a 4 GB DSD album: ≈ 2 min (Zero 3, GbE, USB 2.0 SSD), ≈ 40 s (RV, USB 3.0
-SSD), 3–7 min over Wi-Fi.
+Import time for a 4 GB DSD album: 3–7 min over 5 GHz Wi-Fi, 7–20 min over 2.4 GHz. All
+control and streaming functions are unaffected by these rates.
 
 ## 8. Power
 
 | Item | Steady | Peak |
 |---|---|---|
-| Zero 3 board | 1–2 W | 3 W (all cores) |
+| Orange Pi RV board (Wi-Fi active) | 3–4 W | 6 W (all cores) |
+| Zero LTS board (Wi-Fi active) | 1–1.5 W | 2.5 W |
 | USB DAC dongle (ES9039Q2M or CS43131 with amp) | 0.5–1.0 W (100–200 mA) | 1.3 W |
-| USB SSD | 1–2 W | 3 W |
-| 2.5" USB HDD | 2–2.5 W | 5–6 W at spin-up (≈ 1–1.2 A) |
-| USB hub (powered) | 0.5 W | |
-| **Total (SSD)** | **≈ 4–5 W** | 7 W |
-| **Total (HDD)** | **≈ 5–6 W** | 12 W (needs the hub's own PSU) |
+| USB flash drive | 0.3–0.5 W | 1 W during writes |
+| USB Wi-Fi adapter (mt76, if used on the Zero LTS) | 0.5–1 W | 2 W |
+| **Total (RV)** | **≈ 4–5.5 W** | 8 W |
+| **Total (Zero LTS + USB Wi-Fi)** | **≈ 2.5–4 W** | 6.5 W |
 
-A 5 V / 3 A USB-C supply with a short, thick cable is the minimum for the Zero 3; low input
-voltage is the most common cause of USB disk resets on this board class.
+Use the board's rated supply (RV: 5 V / 4 A; Zero LTS: 5 V / 2 A on micro-USB, which is
+marginal with three USB devices, so use a short, thick cable and a good adapter); low input
+voltage is the most common cause of USB device resets on these boards. No powered hub is
+needed with a flash drive.
 
 ## 9. Timing
 

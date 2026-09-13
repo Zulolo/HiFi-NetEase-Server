@@ -115,9 +115,12 @@ dongle.
 
 ## 6. Software fallback without dropouts (FR-4.5)
 
-Measured on Cortex-A53 class boards (Raspberry Pi 3 B+): DSD256 → PCM ≈ 80 % of a core,
-57 % when the output is forced to 352.8 kHz; DSD128 → 384 kHz reported at 100 % (dropouts).
-Therefore:
+With the ES9039Q2M dongle as the default output and a library capped at DSD256, this path is
+rarely taken (only when the CS43131 dongle is selected for DSD256 material). It is still
+specified so that the fallback is safe when it happens. Measured on Cortex-A53 class boards
+(Raspberry Pi 3 B+): DSD256 → PCM ≈ 80 % of a core, 57 % when the output is forced to
+352.8 kHz; DSD128 → 384 kHz reported at 100 % (dropouts). The JH7110's U74 cores have no SIMD
+unit, so expect similar or worse figures there. Therefore:
 
 1. Keep the fallback PCM rate at the DSD-family rate the device supports (352.8 k, else
    176.4 k) so the resampler works on integer ratios.
@@ -157,8 +160,10 @@ Expected outcomes from the datasheets:
 
 ### 8.2 MPD output blocks
 
-One `audio_output` block per known dongle, `enabled "no"` for all but the active one. MPD
-tolerates blocks whose device is absent as long as they are disabled. Switching = `disableoutput`
+One `audio_output` block per known dongle, `enabled "no"` for all but the active one. The
+ES9039Q2M dongle is the default active output (owner preference; it covers DSD256 natively or
+via DoP); the CS43131 dongle is the second block. MPD tolerates blocks whose device is absent
+as long as they are disabled. Switching = `disableoutput`
 old + `enableoutput` new (FR-5.2); MPD re-opens the device and continues from its buffer.
 Simultaneous playback (FR-5.6) = enable two blocks.
 
@@ -179,10 +184,10 @@ MPD cannot add outputs at runtime, so a new dongle needs one MPD restart; known 
 |---|---|---|
 | `buffer_time` (MPD ALSA output) | 500 000 µs | USB dongles on SBCs tolerate scheduling jitter better with a large buffer; MPD caps at 2 s |
 | `period_time` | 100 000 µs | fewer wakeups |
-| MPD `audio_buffer_size` | 8192 kB | prebuffer for network streams and 24/192 |
+| MPD `audio_buffer_size` | 16384 kB | prebuffer for NetEase streams arriving over Wi-Fi (≈ 30 s of 24/96) |
 | `LimitRTPRIO` / `LimitRTTIME` / `LimitMEMLOCK` | 40 / infinity / 64M | MPD's shipped unit values; output thread gets SCHED_FIFO |
 | CPU governor | `performance` or `ondemand` with `io_is_busy` | avoid frequency dips during isochronous transfers |
-| Wi-Fi power save | off (Ethernet preferred) | |
+| Wi-Fi (the only link) | power save off (`iw dev wlan0 set power_save off`, persisted in the network manager config), 5 GHz band, router AP isolation off, fixed DHCP lease | Wi-Fi power save causes periodic latency spikes that empty small buffers; AP isolation blocks mDNS and Samba |
 | `snd-usb-audio` module | no extra options unless a quirk flag is needed | |
 | Sound servers | none installed | |
 

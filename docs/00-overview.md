@@ -27,5 +27,5 @@ Diagrams are Mermaid blocks inside the documents (03 and 11); GitHub and VS Code
 1. **MPD** plays everything, bit-perfect, with native DSD → DoP → PCM fallback and switchable USB outputs.
 2. **`hifid`** (one Go binary) logs into NetEase with the owner's account, proxies streams into MPD, exports playlists, downloads with tags, accepts resumable uploads, probes DACs and generates MPD's config.
 3. **PWA** on the phone for everything; M.A.L.P. works from day 1; a native app is optional.
-4. **Orange Pi Zero 3** with Armbian Debian 13 first; the same build runs on the Orange Pi RV (riscv64).
+4. **Orange Pi RV** (riscv64, Debian 13) is the deployment board because Wi-Fi is the only link and it has the mature Broadcom driver, more RAM and four USB ports; the Orange Pi Zero LTS (H3, 512 MB) qualifies only with a mainline-driver USB Wi-Fi adapter, decided by the M0 bake-off (ADR-0007).
 5. **M0** proves each dongle's DSD mode on the bench before any feature code is written.

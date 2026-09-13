@@ -6,20 +6,20 @@ Status: draft v0.1 · 2026-09-13 · addresses NFR-2, NFR-4, NFR-5, NFR-7, C-7
 
 | Board | Image | Kernel | Why |
 |---|---|---|---|
-| Orange Pi Zero 3 (primary) | Armbian **Debian 13 (trixie) minimal**, community build | 6.18 mainline | USB, GbE, Wi-Fi supported; kernel already carries the Comtrue/XMOS/FiiO native-DSD quirks; `apt` gives mpd 0.24.4 |
-| Orange Pi Zero 3 (alternative) | Vendor Debian 12 image | 6.1 legacy | Works, but older USB-audio quirk table and Debian 12's mpd 0.23 (use bookworm-backports 0.24) |
-| Orange Pi RV (JH7110) | Debian 13 riscv64 (vendor rootfs or debian-installer) | 6.12 (Debian) with the board DTB, or self-built 6.19 | riscv64 is an official Debian 13 architecture; the RV device tree is in mainline 6.19 |
+| Orange Pi RV, JH7110 (intended deployment board) | Vendor Debian server image for the RV (check its version in M0), or Debian 13 riscv64 installed with debian-installer plus the board DTB | vendor 6.6 series, or Debian 6.12 with the RV DTB, or self-built 6.19 (board DT merged upstream) | riscv64 is an official Debian 13 architecture; Wi-Fi via Broadcom AP6256 (`brcmfmac`, needs the firmware package); mpd 0.24.4 from `apt`. Note: the RV may need the power button pressed to boot; check the wiki for the always-on jumper before deploying headless |
+| Orange Pi Zero LTS, H3, 512 MB (only with a USB Wi-Fi adapter or Ethernet, ADR-0007) | Armbian Debian minimal (armhf), community image, or Debian armhf with the H3 mainline kernel | 6.x mainline | H3 USB/Ethernet well supported; onboard XR819 Wi-Fi is not used; add `zram` swap; `hifid` built with `GOARCH=arm GOARM=7`; MPD buffer 8 MB |
 
-Both: 1.5 GB-RAM Zero 3 variants need the known DRAM-size fix for Armbian; buy the 2 GB or
-4 GB variant if choosing new hardware.
+Wi-Fi is the only link at the speaker's location: after first boot set the network with
+`nmtui` (or `netplan`), pin a DHCP lease on the router, disable power save persistently, and
+confirm the router does not enable AP/client isolation (it blocks mDNS and Samba).
 
 ## 2. Install procedure (rendered as `deploy/scripts/install.sh` in M1)
 
 ```
-1. Flash image, boot, set hostname "hifi", static DHCP lease on the router, disable Wi-Fi power save (or use Ethernet).
-2. apt install mpd mpc alsa-utils ffmpeg avahi-daemon udev inotify-tools                 # both arches
-   optional: samba ; upmpdcli (arm64: vendor repo) ; mympd (arm64: OBS repo)
-3. Disk: mkfs.ext4 -m 1 -L music /dev/sdX1 ; systemd mount unit deploy/systemd/srv-music.mount (noatime, nofail, x-systemd.device-timeout=30)
+1. Flash image, boot, set hostname "hifi", join Wi-Fi (5 GHz), pin a DHCP lease on the router, disable Wi-Fi power save persistently.
+2. apt install mpd mpc alsa-utils ffmpeg avahi-daemon udev inotify-tools samba f3        # both arches
+   optional: upmpdcli (arm64: vendor repo; riscv64: build) ; mympd (arm64: OBS repo; not on 512 MB boards)
+3. Flash drive: f3probe /dev/sdX (genuine capacity) ; mkfs.ext4 -m 1 -L hifi /dev/sdX1 ; units deploy/systemd/srv-hifi.mount + bind mounts (noatime, commit=60, nofail)
    mkdir -p /srv/music/{local,netease,playlists} /srv/data/{mpd,hifid,incoming} ; chown mpd:audio / hifid:audio
 4. udev: copy deploy/udev/90-hifi-dac.rules ; udevadm control --reload ; replug dongles ; check /proc/asound/cards
 5. MPD: copy deploy/mpd/mpd.conf.example -> /etc/mpd.conf (hifid regenerates it later) ; drop-in deploy/systemd/mpd.service.d/override.conf
@@ -61,7 +61,7 @@ paths:
   incoming: /srv/data/incoming
 mpd: { socket: /run/mpd/socket, host: 127.0.0.1, port: 6600 }
 netease:
-  level_preference: [hires, lossless, exhigh, higher, standard]
+  level_preference: [jymaster, hires, lossless, exhigh, higher, standard]   # SVIP account
   stream_mode: redirect                   # redirect | pipe
   cache_while_playing: false
   export_playlists_every: 6h
@@ -80,9 +80,9 @@ outputs:
     alsa_id: ES9039A
     chip: es9039q2m
     dsd_mode: auto
-    volume_mode: fixed
+    volume_mode: hardware        # in-chip volume covers PCM and DSD; set fixed if DoP shows noise in M0
     max_rate: 768000
-preferred_output: dawnpro
+preferred_output: es9039a        # owner preference; DSD library is DSD256 or lower
 discovery: { mdns: true, udp_beacon: true }
 ```
 
@@ -138,6 +138,7 @@ Restore = reinstall from the procedure in §2 and copy the three items back.
 cd server
 GOOS=linux GOARCH=arm64  CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/hifid-arm64  ./cmd/hifid
 GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/hifid-riscv64 ./cmd/hifid
+GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/hifid-armhf ./cmd/hifid   # Zero LTS
 ```
 
 Pure-Go dependencies only (SQLite via a pure-Go driver, no cgo) so that cross-compilation

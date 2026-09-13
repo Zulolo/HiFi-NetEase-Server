@@ -10,8 +10,12 @@ Linux can only be confirmed on the actual dongles.
 
 Goal: prove the audio path on the chosen board before writing anything.
 
-1. Flash Debian (image choice per ADR-0007), attach USB disk, one DAC, LAN.
-2. `apt install mpd mpc alsa-utils ffmpeg`; run `deploy/scripts/probe-dac.sh` on every dongle:
+0. Record the ES9039Q2M dongle's `lsusb` ID (docs/12 Q13); if the Zero LTS is to be tried,
+   obtain a `mt76` USB Wi-Fi adapter and the 13-pin expansion board first (ADR-0007).
+1. Flash Debian on the Orange Pi RV (and Armbian armhf on the Zero LTS if trying it), check
+   the flash drive with `f3probe`, attach it and the ES9039Q2M dongle, join 5 GHz Wi-Fi with
+   power save off.
+2. `apt install mpd mpc alsa-utils ffmpeg samba`; run `deploy/scripts/probe-dac.sh` on every dongle:
    record VID:PID, ALSA card name, `/proc/asound/cardX/stream0` formats, native DSD flag,
    supported rates. Fill the table in docs/04 §7.
 3. Hand-written `mpd.conf` with one `hw:` output; play FLAC 16/44, 24/96, 24/192, DSD64,
@@ -19,8 +23,12 @@ Goal: prove the audio path on the chosen board before writing anything.
 4. Run `deploy/scripts/bench-dsd.sh`: CPU % for dsd2pcm and for soxr on this CPU;
    write results into docs/05 §"Measured on hardware".
 5. Install M.A.L.P. on the phone, control MPD on port 6600: play/pause/volume/outputs.
+6. Bake-off (ADR-0007): 24 h Wi-Fi log (ping loss, `iperf3` every hour) and 24 h DSD128/24-192
+   playback while a 4 GB album is copied over Samba; record RAM headroom. Optionally install
+   `upmpdcli` and test the NetEase app's cast button (docs/06 §6).
 
-Exit criteria: 24 h of 24/192 PCM playback without dropouts; each dongle's best DSD mode known.
+Exit criteria: 24 h of 24/192 PCM playback without dropouts over Wi-Fi; each dongle's best DSD
+mode known; deployment board chosen.
 
 ## M1 · NetEase via MPD, interim tools · ~1 week
 
@@ -45,14 +53,16 @@ Exit criteria: phone PWA controls MPD; NetEase playable through go-musicfox.
 
 Exit criteria: FR-1 acceptance test passes; go-musicfox no longer needed.
 
-## M3 · Upload and library · ~1–2 weeks
+## M3 · Import and library · ~1–2 weeks
 
-1. tus endpoint, finalize pipeline, hash verification, duplicate warning.
-2. Upload page in the PWA (drag-and-drop folders, parallel chunks, resume after reload).
-3. Library screens (artists/albums/folders/recent), `update` triggers, cover art.
-4. Optional samba share and documentation for SMB/SFTP paths.
+1. Samba share (installed in M0) wired to `hifid`: inotify watcher, debounced incremental
+   MPD updates, "recently added" index, duplicate warning.
+2. Library screens (artists/albums/folders/recent), `update` triggers, cover art.
+3. tus endpoint, finalize pipeline, hash verification (secondary path).
+4. Upload page in the PWA (drag-and-drop folders, parallel chunks, resume after reload).
 
-Exit criteria: FR-3 acceptance test (4 GB DSF folder) passes.
+Exit criteria: FR-3 acceptance test (4 GB DSF folder over Wi-Fi, via Samba and via the web page)
+passes.
 
 ## M4 · Output manager and DSD polish · ~1–2 weeks
 
@@ -61,8 +71,10 @@ Exit criteria: FR-3 acceptance test (4 GB DSF folder) passes.
    controlled MPD restart, hot-plug via udev → `hifid` → rescan.
 3. `format.delivery` reporting (native/DoP/converted) from MPD status + ALSA hw_params.
 4. Volume policy per output (hardware/fixed), UI feedback.
+5. Optional: offline PCM twin for DSD256 files, only if the CS43131 dongle is used for them.
 
-Exit criteria: FR-4 and FR-5 acceptance tests pass on at least one ES9039Q2M and one CS43131 dongle.
+Exit criteria: FR-4 and FR-5 acceptance tests pass on the ES9039Q2M dongle (default) and the
+CS43131 dongle.
 
 ## M5 · Hardening · ~1 week
 

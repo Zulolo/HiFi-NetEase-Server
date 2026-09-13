@@ -26,7 +26,7 @@ port                   "6600"
 max_connections        "20"
 
 # ---- buffers -----------------------------------------------------------------------
-audio_buffer_size      "8192"                   # kB, prebuffer for streams and 24/192
+audio_buffer_size      "16384"                  # kB, prebuffer for NetEase streams over Wi-Fi (8192 on a 512 MB board)
 
 # ---- inputs ------------------------------------------------------------------------
 input {
@@ -75,11 +75,12 @@ resampler {
 
 # Example: CS43131 dongle behind a Comtrue bridge (Moondrop Dawn Pro, 2fc6:f06a).
 # Native DSD expected on kernels >= 6.14 (Comtrue vendor quirk); DoP as backup to DSD128.
+# Second output (owner prefers the ES9039Q2M dongle below).
 audio_output {
     type               "alsa"
     name               "Moondrop Dawn Pro"
     device             "hw:CARD=DawnPro,DEV=0"
-    enabled            "yes"
+    enabled            "no"
     auto_resample      "no"
     auto_format        "no"
     auto_channels      "no"
@@ -93,12 +94,13 @@ audio_output {
     mixer_control      "PCM"
 }
 
-# Example: ES9039Q2M dongle (XMOS or Comtrue bridge). Native DSD to DSD512 expected.
+# Default output: ES9039Q2M dongle (XMOS or Comtrue bridge). Native DSD to DSD512 expected,
+# which covers the owner's DSD256-and-below library without any software fallback.
 audio_output {
     type               "alsa"
     name               "ES9039Q2M dongle"
     device             "hw:CARD=ES9039A,DEV=0"
-    enabled            "no"
+    enabled            "yes"
     auto_resample      "no"
     auto_format        "no"
     auto_channels      "no"
@@ -106,7 +108,9 @@ audio_output {
     period_time        "100000"
     dop                "no"
     allowed_formats    "44100:*:* 48000:*:* 88200:*:* 96000:*:* 176400:*:* 192000:*:* 352800:*:* 384000:*:* 705600:*:* 768000:*:* *:dsd:* 352800:24:2"
-    mixer_type         "none"                   # purist: fixed 100 %, volume on the Acton IV
+    mixer_type         "hardware"               # ES9039Q2M applies volume in-chip for PCM and DSD; use "none" if DoP + volume shows noise in M0
+    mixer_device       "hw:CARD=ES9039A"
+    mixer_control      "PCM"
 }
 
 # Backstop block used only if allowed_formats does not pick the intended fallback rate (R11):
