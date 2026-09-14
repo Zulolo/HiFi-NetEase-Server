@@ -6,8 +6,8 @@ Status: draft v0.1 · 2026-09-13 · addresses NFR-2, NFR-4, NFR-5, NFR-7, C-7
 
 | Board | Image | Kernel | Why |
 |---|---|---|---|
-| Orange Pi RV, JH7110 (intended deployment board) | Vendor Debian server image for the RV (check its version in M0), or Debian 13 riscv64 installed with debian-installer plus the board DTB | vendor 6.6 series, or Debian 6.12 with the RV DTB, or self-built 6.19 (board DT merged upstream) | riscv64 is an official Debian 13 architecture; Wi-Fi via Broadcom AP6256 (`brcmfmac`, needs the firmware package); mpd 0.24.4 from `apt`. Note: the RV may need the power button pressed to boot; check the wiki for the always-on jumper before deploying headless |
-| Orange Pi Zero LTS, H3, 512 MB (only with a USB Wi-Fi adapter or Ethernet, ADR-0007) | Armbian Debian minimal (armhf), community image, or Debian armhf with the H3 mainline kernel | 6.x mainline | H3 USB/Ethernet well supported; onboard XR819 Wi-Fi is not used; add `zram` swap; `hifid` built with `GOARCH=arm GOARM=7`; MPD buffer 8 MB |
+| Orange Pi Zero LTS, H3, 512 MB (first deployment, ADR-0007) | Armbian Debian minimal (armhf), community image, or Debian armhf with the H3 mainline kernel | 6.x mainline with the `xradio` (XR819) driver from Armbian's patches | H3 USB well supported; onboard XR819 on the 2.4 GHz network with the watchdog timer; `zram` swap; `hifid` built with `GOARCH=arm GOARM=7`; MPD buffer 8 MB; no myMPD/upmpdcli |
+| Orange Pi RV, JH7110 (fallback) | Vendor Debian server image for the RV (check its version in M0), or Debian 13 riscv64 installed with debian-installer plus the board DTB | vendor 6.6 series, or Debian 6.12 with the RV DTB, or self-built 6.19 (board DT merged upstream) | riscv64 is an official Debian 13 architecture; Wi-Fi via Broadcom AP6256 (`brcmfmac`, needs the firmware package); mpd 0.24.4 from `apt`. Note: the RV may need the power button pressed to boot; check the wiki for the always-on jumper before deploying headless |
 
 Wi-Fi is the only link at the speaker's location: after first boot set the network with
 `nmtui` (or `netplan`), pin a DHCP lease on the router, disable power save persistently, and
@@ -40,6 +40,7 @@ can write `/etc/mpd.conf` through a small `sudoers` rule limited to `install -m 
 | `mpd.service` (Debian) + `override.conf` | `After=srv-music.mount network-online.target`, `RequiresMountsFor=/srv/music /srv/data`, `LimitRTPRIO=40`, `LimitRTTIME=infinity`, `LimitMEMLOCK=64M`, `Restart=on-failure` |
 | `hifid.service` | `After=mpd.service`, `Wants=mpd.service`, `User=hifid`, `EnvironmentFile=/etc/hifid/env`, `Restart=always`, `RestartSec=3`, `ProtectSystem=strict`, `ReadWritePaths=/srv/music /srv/data/hifid /srv/data/incoming /run/hifid`, `NoNewPrivileges` (except the sudo path for mpd.conf, handled by a separate one-shot unit `hifid-apply-mpd.service` triggered via a path unit) |
 | `srv-hifi.mount` + `srv-music.mount` / `srv-data.mount` | the disk is mounted once at `/srv/hifi`; `/srv/music` and `/srv/data` are bind mounts of its subdirectories so both trees share one filesystem (atomic rename for uploads) |
+| `wifi-watchdog.timer` + `.service` | every 2 min: ping the gateway 3×; on failure bounce `wlan0` (and `wpa_supplicant`/NetworkManager) and log it; counters feed `/system/status` (XR819 mitigation, R16) |
 | `hifid-dac-hotplug@.service` | started by the udev rule `RUN+="/bin/systemctl start hifid-dac-hotplug@%k.service"`; posts `/api/v1/outputs/rescan` over the local unix socket `/run/hifid/api.sock` (no token) |
 | `avahi-daemon` | `/etc/avahi/services/hifid.service` publishes `_hifid._tcp` and `_http._tcp` |
 

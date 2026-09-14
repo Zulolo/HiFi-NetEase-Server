@@ -143,6 +143,13 @@ POST   /downloads                    {"items":[{"ref":"ncm:123"},{"ref":"ncm:pla
 GET    /downloads                    -> [ {"job":"…","state":"queued|running|done|failed|cancelled","done":17,"failed":1,"total":120,"bytes":…} ]
 GET    /downloads/{job}              -> job + per-song rows
 DELETE /downloads/{job}              cancel (files already completed stay)
+
+GET    /netease/sync                 -> { "subscriptions":[{"ref":"ncm:liked"},{"ref":"ncm:playlist:456","level":"best"}],
+                                         "window":{"start":"01:00","end":"07:00","when_idle":true},
+                                         "pace":{"per_song_seconds":15,"max_per_day":600,"concurrency":2},
+                                         "status":{"last_run":"…","on_disk":1203,"wanted":1240,"next_run":"…"} }
+PUT    /netease/sync                 replace the configuration above
+POST   /netease/sync/run             {} -> {"job":"sync_20260914"}     start a sync now (ignores the window, keeps the pace)
 ```
 
 ## 8. Local library (FR-3.3)

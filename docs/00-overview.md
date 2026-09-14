@@ -1,8 +1,8 @@
 # 00 · Documentation Overview
 
-Design set for a headless HiFi music server on an Orange Pi that plays the owner's 网易云音乐
-library and local files (including DSD) through USB DAC dongles into a Marshall Acton IV, controlled
-from a phone. Read in order; each document cites requirement IDs from 01.
+Design set for a headless HiFi music server on a small Debian SBC that plays a 网易云音乐
+library and local files (including DSD) through USB DAC dongles into a speaker with an analog
+input, controlled from a phone. Read in order; each document cites requirement IDs from 01.
 
 | # | Document | What it answers |
 |---|---|---|
@@ -27,5 +27,5 @@ Diagrams are Mermaid blocks inside the documents (03 and 11); GitHub and VS Code
 1. **MPD** plays everything, bit-perfect, with native DSD → DoP → PCM fallback and switchable USB outputs.
 2. **`hifid`** (one Go binary) logs into NetEase with the owner's account, proxies streams into MPD, exports playlists, downloads with tags, accepts resumable uploads, probes DACs and generates MPD's config.
 3. **PWA** on the phone for everything; M.A.L.P. works from day 1; a native app is optional.
-4. **Orange Pi RV** (riscv64, Debian 13) is the deployment board because Wi-Fi is the only link and it has the mature Broadcom driver, more RAM and four USB ports; the Orange Pi Zero LTS (H3, 512 MB) qualifies only with a mainline-driver USB Wi-Fi adapter, decided by the M0 bake-off (ADR-0007).
+4. **Orange Pi Zero LTS** (H3, 512 MB) hosts the first deployment: playback is mostly from local files and the always-on box downloads in the background, so its weak XR819 Wi-Fi is mitigated by an offline-first design and a watchdog; the Orange Pi RV (riscv64) is the fallback (ADR-0007).
 5. **M0** proves each dongle's DSD mode on the bench before any feature code is written.

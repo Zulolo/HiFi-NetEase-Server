@@ -7,8 +7,8 @@
 ## Context
 
 Multi-file imports of multi-GB DSD albums from a Windows PC over **Wi-Fi** onto a 512 GB USB
-flash drive (sustained write 10–30 MB/s). The owner prefers Windows Explorer drag-and-drop
-over a web page but still wants a browser upload as a second path. Survey in docs/07.
+flash drive (sustained write 10–30 MB/s). Windows Explorer drag-and-drop is preferred over a
+web page, with a browser upload kept as a second path. Survey in docs/07.
 
 ## Options considered
 

@@ -75,7 +75,7 @@ resampler {
 
 # Example: CS43131 dongle behind a Comtrue bridge (Moondrop Dawn Pro, 2fc6:f06a).
 # Native DSD expected on kernels >= 6.14 (Comtrue vendor quirk); DoP as backup to DSD128.
-# Second output (owner prefers the ES9039Q2M dongle below).
+# Second output (the ES9039Q2M dongle below is the default).
 audio_output {
     type               "alsa"
     name               "Moondrop Dawn Pro"
@@ -95,7 +95,7 @@ audio_output {
 }
 
 # Default output: ES9039Q2M dongle (XMOS or Comtrue bridge). Native DSD to DSD512 expected,
-# which covers the owner's DSD256-and-below library without any software fallback.
+# which covers a DSD256-and-below library without any software fallback.
 audio_output {
     type               "alsa"
     name               "ES9039Q2M dongle"
