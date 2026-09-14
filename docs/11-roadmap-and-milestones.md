@@ -10,11 +10,11 @@ Linux can only be confirmed on the actual dongles.
 
 Goal: prove the audio path on the chosen board before writing anything.
 
-0. Record the ES9039Q2M dongle's `lsusb` ID (docs/12 Q13); if the Zero LTS is to be tried,
-   obtain a `mt76` USB Wi-Fi adapter and the 13-pin expansion board first (ADR-0007).
-1. Flash Debian on the Orange Pi RV (and Armbian armhf on the Zero LTS if trying it), check
-   the flash drive with `f3probe`, attach it and the ES9039Q2M dongle, join 5 GHz Wi-Fi with
-   power save off.
+0. Record the ES9039Q2M dongle's `lsusb` ID (docs/12 Q13). Zero LTS bill of materials:
+   13-pin expansion board or small USB hub, heatsink, good 5 V/2 A micro-USB supply.
+1. Flash Armbian (armhf, minimal) on the Zero LTS, check the flash drive with `f3probe`,
+   attach it and the ES9039Q2M dongle, join the 2.4 GHz network with power save off and the
+   Wi-Fi watchdog timer enabled. (RV only if the Zero LTS fails the thresholds below.)
 2. `apt install mpd mpc alsa-utils ffmpeg samba`; run `deploy/scripts/probe-dac.sh` on every dongle:
    record VID:PID, ALSA card name, `/proc/asound/cardX/stream0` formats, native DSD flag,
    supported rates. Fill the table in docs/04 §7.
@@ -23,12 +23,12 @@ Goal: prove the audio path on the chosen board before writing anything.
 4. Run `deploy/scripts/bench-dsd.sh`: CPU % for dsd2pcm and for soxr on this CPU;
    write results into docs/05 §"Measured on hardware".
 5. Install M.A.L.P. on the phone, control MPD on port 6600: play/pause/volume/outputs.
-6. Bake-off (ADR-0007): 24 h Wi-Fi log (ping loss, `iperf3` every hour) and 24 h DSD128/24-192
-   playback while a 4 GB album is copied over Samba; record RAM headroom. Optionally install
-   `upmpdcli` and test the NetEase app's cast button (docs/06 §6).
+6. Thresholds (ADR-0007): 24 h Wi-Fi log (ping loss, outage length, `iperf3` every hour) and
+   24 h DSD128/24-192 local playback while a 500 MB album is copied over Samba; record RAM
+   headroom. Optionally install `upmpdcli` and test the NetEase app's cast button (docs/06 §6).
 
-Exit criteria: 24 h of 24/192 PCM playback without dropouts over Wi-Fi; each dongle's best DSD
-mode known; deployment board chosen.
+Exit criteria: 24 h of 24/192 local playback without dropouts; each dongle's best DSD mode
+known; Wi-Fi outages ≤ 60 s and loss ≤ 2 %, otherwise escalate (USB Wi-Fi adapter, then RV).
 
 ## M1 · NetEase via MPD, interim tools · ~1 week
 
@@ -50,8 +50,11 @@ Exit criteria: phone PWA controls MPD; NetEase playable through go-musicfox.
 3. Catalogue endpoints + PWA screens: playlists, liked, daily, search, cloud disk.
 4. Playlist export to `playlists/NetEase/*.m3u` (extm3u) so M.A.L.P. sees them.
 5. Download jobs with tagging and index; proxy prefers local copies.
+6. Offline sync scheduler (docs/08 §7.1): subscriptions, night window, pacing, resume,
+   "on disk / wanted" status in the PWA. This is the main mode of use.
 
-Exit criteria: FR-1 acceptance test passes; go-musicfox no longer needed.
+Exit criteria: FR-1 acceptance test passes; a subscribed playlist is fully on disk after one
+night; go-musicfox no longer needed.
 
 ## M3 · Import and library · ~1–2 weeks
 

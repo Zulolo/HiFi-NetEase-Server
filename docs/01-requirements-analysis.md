@@ -13,11 +13,12 @@ evaluation) refer back to the requirement IDs defined here (FR-x, NFR-x, C-x).
 |------|-------|
 | Speaker | Marshall Acton IV. Inputs: 3.5 mm AUX (analog), RCA (analog), Bluetooth 5.3 (SBC/AAC/LDAC/LC3). No USB, no S/PDIF, no HDMI, no Wi-Fi. |
 | Connection to speaker | 3.5 mm AUX cable from a USB DAC dongle. |
-| Server board candidates | Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB) and Orange Pi Zero LTS (Allwinner H3, armhf, 512 MB, XR819 Wi-Fi). Both run Debian server images. Larger boards (including a Raspberry Pi 5) exist but the owner prefers a low-power board. |
+| Server board | Reference targets: Orange Pi Zero LTS (Allwinner H3, armhf, 512 MB, XR819 Wi-Fi) first; Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB) as fallback. Both run Debian server images. A low-power board is preferred over a faster one. |
+| Usage profile | Playback mostly from local files (NetEase downloads and Samba uploads); the box is always on, so downloads run in the background. |
 | OS storage | 64 GB microSD (TF) card. |
 | Music storage | 512 GB USB flash drive. |
 | DACs | Several "USB-C/USB-A to 3.5 mm" HiFi dongles, ES9039Q2M-based (preferred, default output) and CS43131-based, with different USB bridge chips. |
-| Music source 1 | 网易云音乐 (NetEase Cloud Music) **SVIP** account with a large saved library (playlists, liked songs, possibly 云盘 cloud disk). |
+| Music source 1 | 网易云音乐 (NetEase Cloud Music) account with a large saved library (playlists, liked songs, possibly 云盘 cloud disk). The design assumes an SVIP-tier account for the default quality ladder; the ladder is configurable for other tiers. |
 | Music source 2 | Local files on a Windows PC, to be imported over the LAN; DSD material is DSD256 or lower. |
 | Controller | An Android phone (primary); iOS should not be excluded. |
 | Network | Home LAN reached over **Wi-Fi only** at the speaker's location (no Ethernet). No requirement for access from the internet. |
@@ -46,6 +47,7 @@ app. The owner's account is the only account used; nothing is done to bypass lic
 | FR-1.3 | Browse: my playlists, liked songs (我喜欢的音乐), daily recommendation, playlist detail, album, artist, search, cloud disk (云盘). |
 | FR-1.4 | Resolve a playable stream URL at the best quality the account is entitled to (standard → higher → exhigh → lossless → hires → …), with graceful downgrade. |
 | FR-1.5 | Download a song / whole playlist to the local library with tags and cover art embedded, so it is playable offline and shows up in the local library. |
+| FR-1.7 | Keep selected NetEase playlists (and liked songs) synced to disk automatically: new additions are downloaded in a paced background job while the box is idle, so day-to-day playback is local and does not depend on Wi-Fi. |
 | FR-1.6 | Runs on Debian arm64 and riscv64 without a display, as a systemd service, within the RAM budget of the smallest candidate board (see NFR-3). |
 
 **Acceptance.** From a phone on the LAN: scan QR → see own playlists → tap a song → sound
@@ -139,7 +141,7 @@ own analog jack) may be attached at once; the user picks the active one from the
 | C-3 | Unofficial API use is against NetEase ToS in spirit; endpoints change without notice. | Personal, single-account, LAN-only use; no redistribution; expect maintenance. Documented in 12-risks. |
 | C-4 | Target architectures: riscv64 (RV) first, armhf (Zero LTS) and arm64 kept. | Prefer components packaged in Debian for all three, and Go for custom code (trivial cross-compilation, no runtime). Avoid Electron/Node/Chromium on the server. |
 | C-5 | The Zero LTS has 512 MB RAM, a Cortex-A7 CPU and USB 2.0 only. | RAM budget ≤ 300 MB for all our services including Samba; no optional extras on that board; no software DSD conversion there; USB 2.0 is sufficient for audio (see doc 05). |
-| C-9 | Wi-Fi is the only network link. | Wi-Fi driver maturity is a board-selection criterion; power save off; larger stream buffers; imports over Wi-Fi run at 10–25 MB/s. |
+| C-9 | Wi-Fi is the only network link; on the Zero LTS it is the 2.4 GHz-only XR819 (separate 2.4 GHz and 5 GHz networks exist). | Offline-first design: NetEase content is synced to disk in the background; every network job is retry-tolerant; a watchdog keeps the link up; imports over this chip run at ≈ 1–3 MB/s. |
 | C-10 | Music storage is a USB flash drive. | Sustained writes 10–30 MB/s; keep database/index writes small; verify genuine capacity before use. |
 | C-6 | Acton IV inputs are analog; it digitizes AUX internally for its DSP. | The audible ceiling is set by the speaker's ADC/DSP. The chain is still built bit-perfect up to the DAC, but ultra-high rates (≥ 384 kHz, DSD512) bring no audible gain on this speaker. |
 | C-7 | OS on a microSD card. | Keep write-heavy data (library DB, caches, downloads, logs) on the USB disk; keep the card mostly read-only in spirit. |

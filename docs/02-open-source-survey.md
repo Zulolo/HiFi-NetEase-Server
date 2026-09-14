@@ -101,7 +101,7 @@ Sources: [format.c](https://github.com/torvalds/linux/blob/master/sound/usb/form
 | JCally JM6 / JM6 Pro | Conexant CX31993 | integrated | PCM only, no DSD |
 | Tanchjim Space, Fosi DS2, Kiwi Ears Allegro, Truthear Shio | CS43131 / CS43131 / ES9028Q2M / CS43198 | UNVERIFIED | probe in M0 |
 
-No public `stream0` dumps exist for the owner's exact dongles: **M0 must probe each one**.
+No public `stream0` dumps exist for these dongle classes: **M0 must probe each one**.
 
 ### 2.4 DoP facts
 

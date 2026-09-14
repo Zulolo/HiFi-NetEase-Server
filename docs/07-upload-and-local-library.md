@@ -6,7 +6,7 @@ Status: draft v0.1 · 2026-09-13 · addresses FR-3, FR-4.1, NFR-8, C-7
 
 | Path | For | Resumable | Multi-GB | Needs our code |
 |---|---|---|---|---|
-| **SMB share (samba)** — primary | Bulk drag-and-drop from Windows Explorer, robocopy; owner's preferred path | OS-level | Yes | Watcher only |
+| **SMB share (samba)** — primary | Bulk drag-and-drop from Windows Explorer, robocopy; the preferred path | OS-level | Yes | Watcher only |
 | **Browser upload (tus)** — secondary | "Web page, many files at once" from any browser, progress in the PWA | Yes | Yes | Yes |
 | SFTP (OpenSSH + WinSCP) | Scripted or occasional | Client-level | Yes | No |
 | rsync (cwRsync/WSL) | Mirroring a PC folder | Yes | Yes | No |
@@ -16,7 +16,7 @@ Status: draft v0.1 · 2026-09-13 · addresses FR-3, FR-4.1, NFR-8, C-7
 Decision (ADR-0004, revised): Samba is installed by default and is the primary import path,
 with an inotify watcher in `hifid` that triggers incremental MPD updates; the tus browser
 upload is the secondary path, built after Samba is live. Both write into the same tree and
-trigger the same scan. Over the owner's Wi-Fi link both run at 10–25 MB/s.
+trigger the same scan. Over a Wi-Fi link both run at the Wi-Fi rate (docs/05 §7).
 
 ## 2. Browser upload design (FR-3.1, FR-3.2)
 

@@ -141,7 +141,7 @@ download, no local library and no format badge.
   made in the PWA applies to casts as well.
 - The NetEase Android app has had a DLNA "投射到设备" entry that moved between versions and
   was removed and restored around 2022; the current entry point must be verified on the
-  owner's phone before relying on it.
+  phone in use before relying on it.
 - Limits: the server is not logged in, quality is whatever the phone app chooses, no download,
   no local library. Documented as a convenience for guests.
 

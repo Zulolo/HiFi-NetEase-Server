@@ -7,12 +7,11 @@ hardware" is filled in during milestone M0 (docs/11) with `tools/bench` results.
 
 ## 1. Candidate boards
 
-The project owner has an **Orange Pi Zero LTS** (confirmed: Allwinner H3, 512 MB) and an
-**Orange Pi RV** (confirmed: StarFive JH7110), plus larger boards including a Raspberry Pi 5
-that the owner would rather not use for such a simple task. The RV2 is listed for reference
-only.
+The reference targets are the **Orange Pi Zero LTS** (Allwinner H3, 512 MB) and the
+**Orange Pi RV** (StarFive JH7110). A Raspberry Pi 5 and the Orange Pi RV2 are listed as
+reference points only.
 
-| | Orange Pi Zero LTS (owned) | Orange Pi RV (owned) | Raspberry Pi 5 (owned, reference) | Orange Pi RV2 (reference) |
+| | Orange Pi Zero LTS (target) | Orange Pi RV (target) | Raspberry Pi 5 (reference) | Orange Pi RV2 (reference) |
 |---|---|---|---|---|
 | SoC | Allwinner H3, 4× Cortex-A7 @ 1.0–1.2 GHz (32-bit armhf) | StarFive JH7110, 4× SiFive U74 @ 1.5 GHz (riscv64) | BCM2712, 4× Cortex-A76 @ 2.4 GHz (arm64) | Ky X1, 8× RV64GCV @ 1.6 GHz |
 | RAM | 512 MB DDR3 | 2 / 4 / 8 GB LPDDR4 | 2 / 4 / 8 / 16 GB | 2 / 4 / 8 GB |
@@ -32,7 +31,7 @@ conversion and for native DSD (pure pass-through), but the board still decodes F
 runs the NetEase service, Samba and the Wi-Fi stack; on the H3 those are all light. The
 CPU is not the constraint. Wi-Fi quality and RAM are.
 
-### 1.1 Decision matrix (weight 1–5), revised after the owner's answers
+### 1.1 Decision matrix (weight 1–5), revised with the settled design inputs
 
 New inputs: Wi-Fi is the only network link (C-9), the disk is a flash drive (C-10), the
 small board is an Orange Pi Zero LTS (H3, 512 MB).
@@ -46,17 +45,16 @@ small board is an Orange Pi Zero LTS (H3, 512 MB).
 | **Wi-Fi driver maturity (4)** | 1 · XR819: 2.4 GHz only, out-of-tree, unstable | 4 · Broadcom AP6256 via mainline `brcmfmac` | 5 · Broadcom CYW43455 via `brcmfmac` |
 | RAM headroom (3) | 1 · 512 MB | 5 · 2–8 GB | 5 |
 | Idle power (2) | 5 | 2 | 3 |
-| Owner already has it (3) | 5 | 5 | 5 |
+| Already available, no purchase (3) | 5 | 5 | 5 |
 | **Weighted score** | **81 / 135** | **113 / 135** | 129 / 135 |
 
-**Decision (ADR-0007, revised):** the Orange Pi RV is the intended deployment board. The
-Zero LTS is kept as an option only if its Wi-Fi problem is removed: a USB Wi-Fi adapter with
-a mainline driver (MediaTek MT7612U or MT7921AU, `mt76`, both 5 GHz capable) or Ethernet.
-The Raspberry Pi 5 would be the most trouble-free host but is over-specified for the task;
-it stays a reference, not a target. The M0 bake-off (24 h Wi-Fi stability, 24 h USB-DAC
-playback during Samba copies, native DSD availability, RAM headroom) decides between the RV
-and a Zero LTS with a USB Wi-Fi adapter, if the owner wants to try the latter. Nothing in the
-design is architecture-specific.
+**Decision (ADR-0007, revised):** the **Zero LTS is the first deployment target**, because
+playback is mostly from local files (so Wi-Fi is not in the audio path), the box is always on
+to download in the background, and a spare low-power board is the preferred host. The score
+above still says the RV is the safer machine; it is the fallback if the XR819 Wi-Fi fails the
+M0 thresholds, after first trying a `mt76` USB Wi-Fi adapter (MediaTek MT7612U or MT7921AU,
+mainline driver, 5 GHz) on the Zero LTS. The Raspberry Pi 5 stays a reference, not a target.
+Nothing in the design is architecture-specific.
 
 ### 1.2 Physical setup
 
@@ -67,11 +65,14 @@ Orange Pi RV:   USB-C 5 V/4 A PSU ──> RV
                 USB 3.0 #3 ──> DAC #2 (CS43131, optional)
                 Wi-Fi 5 (5 GHz) ──> router   (power save off; no Ethernet at this location)
 
-Zero LTS (only with the Wi-Fi fix):
-                micro-USB 5 V/2 A PSU ──> Zero LTS
-                Type-A ──> DAC #1 (ES9039Q2M)
-                13-pin expansion board USB ×2 ──> flash drive, USB Wi-Fi adapter (mt76)
-                (all three share one USB 2.0 root: 20 Mbps Wi-Fi + 10 Mbps disk + 23 Mbps DSD256 is still far below the bus limit)
+Zero LTS (first deployment):
+                micro-USB 5 V/2 A PSU ──> Zero LTS (heatsink on the H3)
+                Type-A ──> DAC #1 (ES9039Q2M, default output)  ──> 3.5 mm ──> Acton IV AUX
+                13-pin expansion board USB (or a small unpowered hub on the Type-A) ──> 512 GB flash drive
+                onboard XR819 ──> 2.4 GHz network   (power save off; watchdog; fixed AP channel)
+                escalation 1: add a mt76 USB Wi-Fi adapter on the expansion board (5 GHz)
+                escalation 2: move everything to the RV
+                (flash drive + DAC + optional Wi-Fi adapter share one USB 2.0 root: 25 Mbps Wi-Fi + 10 Mbps disk + 23 Mbps DSD256 is far below the bus limit)
 ```
 
 A flash drive (≈ 100 mA) plus one dongle (≈ 100–250 mA) stays well inside any of the boards'
@@ -155,7 +156,7 @@ MPD uses at least two threads: the decoder thread (codec + format conversion) an
 output thread (ALSA writes, DoP packing, output-side conversion). They run on different
 cores, so the figures below are per-core percentages.
 
-For the owner's boards: the Zero LTS's Cortex-A7 @ 1.0 GHz is roughly 2–3× slower than an
+For the reference boards: the Zero LTS's Cortex-A7 @ 1.0 GHz is roughly 2–3× slower than an
 A53 @ 1.5 GHz per core, so multiply the decode rows by ≈ 2.5 (FLAC 24/192 ≈ 10–20 % of a core,
 still fine) and treat every software DSD conversion row as **not feasible**; the JH7110's U74
 is comparable to an A53 for integer decode but has no SIMD unit, so the DSD conversion rows
@@ -215,14 +216,17 @@ Mitigations for the expensive case (designed in docs/04):
 
 | Flow | Rate | Comment |
 |---|---|---|
-| NetEase streaming (lossless/hires/jymaster) | 1–9 Mbps down over Wi-Fi | trivial bandwidth; Wi-Fi latency spikes are absorbed by MPD's 16 MB buffer (≈ 30 s at 24/96) |
-| PWA control traffic | < 10 kbps | WebSocket state events |
-| Samba or upload, PC → board over Wi-Fi 5 (5 GHz, good signal) | 10–25 MB/s typical | comparable to the flash drive's write speed, so neither dominates |
-| Same over 2.4 GHz or weak signal | 3–10 MB/s | plan bulk imports near the router or move the board temporarily |
-| Ethernet (not available at the speaker) | ≈ 110 MB/s | would be limited by the flash drive at 10–30 MB/s anyway |
+| Local playback (the main mode) | 0 | files on the flash drive; Wi-Fi is not in the audio path |
+| NetEase background download (lossless ≈ 30 MB/track) | 1–3 MB/s on the XR819 | ≈ 15 s per track, 200+ tracks per hour, so overnight syncs of whole playlists are realistic even on this chip |
+| NetEase live streaming (when used) | 1–9 Mbps | trivial bandwidth; Wi-Fi dropouts are absorbed by MPD's buffer (8 MB on the Zero LTS ≈ 15 s at 24/96) |
+| PWA control traffic | < 10 kbps | WebSocket state events; suffers only when the link drops entirely (watchdog) |
+| Samba copy over the XR819, 2.4 GHz | 1–3 MB/s (10–25 Mbps) | a 4 GB DSD album takes 25–60 min; a 500 MB FLAC album 3–8 min |
+| Samba copy over a `mt76` USB adapter on 5 GHz, or the RV's Wi-Fi | 10–25 MB/s | limited by the flash drive at 10–30 MB/s |
+| Ethernet (not available at the speaker) | ≈ 110 MB/s | would be limited by the flash drive anyway |
 
-Import time for a 4 GB DSD album: 3–7 min over 5 GHz Wi-Fi, 7–20 min over 2.4 GHz. All
-control and streaming functions are unaffected by these rates.
+Since the 2.4 GHz and 5 GHz networks are separate SSIDs, the phone and PC can stay on 5 GHz
+while the Zero LTS uses 2.4 GHz; they still see each other as long as both SSIDs are on the
+same LAN (same router or bridged access points, no client isolation).
 
 ## 8. Power
 

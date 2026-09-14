@@ -6,7 +6,7 @@
 
 ## Context
 
-The owner's dongles are ES9039Q2M (native to DSD512+, DoP to DoP512) and CS43131 (DoP to
+The target dongles are ES9039Q2M-class (native to DSD512+, DoP to DoP512) and CS43131-class (DoP to
 DSD128 only, native to DSD256 via dedicated pins if the bridge exposes it) with unknown USB
 bridges. Linux offers native DSD only for recognised devices. Software conversion of DSD256
 costs 57–80 % of a Cortex-A53 core (docs/05 §5). Details in docs/04.

@@ -1,0 +1,11 @@
+# /etc/systemd/system/wifi-watchdog.service  (run by wifi-watchdog.timer)
+# XR819 mitigation on the Orange Pi Zero LTS (ADR-0007, risk R16): if the default gateway
+# stops answering, bounce the wireless interface so the phone, Samba and downloads recover
+# without a reboot. Harmless on boards with reliable Wi-Fi.
+[Unit]
+Description=Wi-Fi link watchdog (restart wlan0 when the gateway is unreachable)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wifi-watchdog.sh wlan0

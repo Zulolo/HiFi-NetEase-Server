@@ -88,8 +88,9 @@ NetEase `song/url/v1` takes a `level`. Values and what they mean for a HiFi serv
 
 Rules:
 
-1. Preference order is configurable. The owner's account is SVIP, so the default is
-   `jymaster > hires > lossless > exhigh > higher > standard`. `jymaster` (超清母带) is a
+1. Preference order is configurable. The default assumes an SVIP-tier account:
+   `jymaster > hires > lossless > exhigh > higher > standard`; lower tiers simply never get
+   the top levels granted and fall through the ladder. `jymaster` (超清母带) is a
    stereo master-quality FLAC rather than a DSP effect, so it belongs in the ladder; the
    effect variants (`jyeffect`, `sky`, `dolby`, `vivid`) stay excluded.
 2. The response tells the level actually granted; the adapter records it and the UI shows it
@@ -170,6 +171,36 @@ for each song (concurrency 2, polite):
   fully offline and bit-identical to the download.
 - Users who already have `.ncm` files from the official client can convert them on the PC
   with an open-source `ncmdump` tool before uploading; `hifid` does not decrypt `.ncm`.
+
+### 7.1 Offline sync (FR-1.7): keeping playlists on disk automatically
+
+The main mode of use is playback from local files on an always-on box, so the download
+pipeline is driven by a scheduler rather than only by manual taps:
+
+```
+sync config (PWA Settings → NetEase → Offline):
+   subscriptions: [ liked, playlist:456, playlist:789 ]     # what to keep on disk
+   level: best                                               # per subscription optional
+   window: 01:00–07:00 local, plus "when idle" (no playback for 10 min)
+   pace: 1 song per 15 s, max 600 songs per day, 2 concurrent transfers
+   keep_removed: true                                        # never delete files when a song leaves a playlist (NFR-8)
+
+scheduler loop (every 30 min, and on demand):
+   for each subscription: fetch track ids (cached 10 min) → diff against the index
+   enqueue missing ids into the download job "sync-<date>" (dedup against running jobs)
+   run the job under the pace limits, only inside the window or when idle
+   on network error: exponential back-off (1 min … 1 h), resume partial files by Range
+   emit download.progress / download.done; PWA shows "offline: 1,203 / 1,240 tracks"
+```
+
+- The pace limits exist because of NetEase risk control (R18): bulk fetching at full speed
+  from one account is the pattern that gets flagged. 600 lossless tracks per night is
+  ≈ 18 GB, well inside what the XR819 link (1–3 MB/s) can move in six hours.
+- Storage guard: the sync stops at 90 % disk usage and shows a warning (docs/05 §4).
+- Stream proxy preference: once a track is on disk, `/stream/ncm/{id}` serves the local
+  file, and queue items added from NetEase screens play from disk without any Wi-Fi.
+- The exported `.m3u` playlists (§6) are regenerated after each sync so that M.A.L.P. also
+  plays the local copies.
 
 ## 8. Rate limiting, caching, and politeness
 
