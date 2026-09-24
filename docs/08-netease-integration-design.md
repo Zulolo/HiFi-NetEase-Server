@@ -103,6 +103,23 @@ Rules:
    `trial` in the UI and skipped in "play all" unless the user opts in.
 5. `fee`/`privilege` fields are cached per song for 6 h to avoid re-asking.
 
+Measured on 2026-09-24 with the owner's SVIP account (`vipType 110`) against track 22605222,
+via `ncmctl curl --kind weapi SongPlayerV1`:
+
+| Requested level | Granted level | Bitrate | Format | Size |
+|---|---|---|---|---|
+| standard | standard | 128 kbps | mp3 | 3.6 MB |
+| exhigh | exhigh | 320 kbps | mp3 | 9.1 MB |
+| lossless | lossless | 990 kbps | flac | 28.2 MB |
+| hires | **lossless** (downgraded) | 990 kbps | flac | 28.2 MB |
+| jymaster | jymaster | 5.52 Mbps | flac 24/192 | 157 MB |
+
+Two things are confirmed on real data. First, SVIP entitlement is genuine: `jymaster` resolves
+to a 24-bit/192 kHz master. Second, `hires` silently degraded to `lossless` on a track with no
+Hi-Res master while `jymaster` still succeeded, so the granted level is **not** a monotonic
+function of the requested one. Rule 2 above (always read back the granted `level`) is therefore
+mandatory rather than defensive, and the ladder must keep trying lower rungs on its own terms.
+
 ## 5. Audio delivery: the local stream proxy
 
 MPD's queue must never hold raw CDN URLs (C-2: they expire in minutes and are bound to the
@@ -118,14 +135,27 @@ Behaviour of `GET /stream/ncm/{id}`:
 if local copy exists (downloaded earlier)      -> serve file, Range supported, correct Content-Type
 else
    url = cache.get(id) or SongURL(level=permitted) ; cache until (expi - 60 s), expi is 1200 s today
-   if config.stream.mode == "redirect"           -> 302 Location: <cdn url>        (default, zero-copy)
-   else                                          -> pipe bytes; optional tee into cache dir
+   if config.stream.mode == "pipe"               -> pipe bytes, rewrite Content-Type (default, ADR-0008)
+   else                                          -> 302 Location: <cdn url>        (redirect, lossy-only)
 ```
 
-- Redirect mode costs nothing on a 1 GB board and MPD's `curl` input follows redirects and
-  supports Range for seeking.
-- Pipe mode exists for two cases: CDN refuses the User-Agent MPD sends, or "cache while
-  playing" is wanted. It is a config switch, not a code branch in MPD.
+- **Pipe mode is the default (ADR-0008), because redirect mode cannot play lossless.**
+  Measured on the target board on 2026-09-24: the NetEase CDN serves lossless payloads with
+  `Content-Type: audio/mpeg; charset=UTF-8` even when the object really is FLAC (a `.flac`
+  URL, 164 723 846 bytes, confirmed by `file` and `ffprobe` as FLAC 24-bit/192 kHz). MPD picks
+  its decoder from the MIME type, selects `mad`, and aborts with
+  `mad: input does not appear to be a mp3 bit stream`, then
+  `avformat_open_input() failed: Invalid data found when processing input`. A 302 inherits the
+  same wrong header because MPD follows it to the CDN, so redirect mode fails on every
+  `lossless`, `hires` and `jymaster` track.
+- The proxy therefore reads the bytes itself and re-sends `Content-Type: audio/flac` (or
+  `audio/mpeg` for the genuinely lossy levels), passes `Content-Length` and `Content-Range`
+  through, and honours `Range` — the CDN answers `HTTP/1.1 206 Partial Content`, so seeking
+  and MPD's read-ahead still work. Verified end to end on the bench: MPD played a `jymaster`
+  stream and ALSA delivered `S24_3LE @ 192000 Hz, 2 ch` bit-perfect to the ES9039 dongle at
+  0.6 % CPU and 80 MB RSS.
+- Redirect mode stays available as a config switch for lossy-only setups and for debugging.
+  It is cheaper, but it must not be the default.
 - Tags: MPD reads tags from the FLAC/MP3 stream, but NetEase files often carry sparse tags.
   After `addid`, `hifid` issues MPD `addtagid` for Title, Artist, Album, Track, Date and stores
   the cover URL in its own queue-metadata map keyed by MPD song id. This is the officially
@@ -225,7 +255,7 @@ scheduler loop (every 30 min, and on demand):
 | Session invalid | `netease.session` event; catalogue endpoints return 401 with `code=ncm_login_required`; local library unaffected. |
 | URL resolution fails for a queued song | Proxy returns 502; MPD skips to next song (its normal behaviour on stream errors) and `hifid` logs the song id. |
 | API schema change | Adapter returns typed errors; UI shows "NetEase temporarily unavailable"; a regression test suite with recorded fixtures is part of the server tests. |
-| CDN rejects redirect | Config switch to pipe mode with a browser-like User-Agent. |
+| CDN rejects redirect, or mislabels FLAC as `audio/mpeg` (observed 2026-09-24) | Pipe mode is the default (ADR-0008): it rewrites `Content-Type` and sends a browser-like User-Agent. |
 
 ## 10. Legal and etiquette notes (C-3)
 

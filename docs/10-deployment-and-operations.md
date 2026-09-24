@@ -64,7 +64,7 @@ paths:
 mpd: { socket: /run/mpd/socket, host: 127.0.0.1, port: 6600 }
 netease:
   level_preference: [jymaster, hires, lossless, exhigh, higher, standard]   # SVIP account
-  stream_mode: redirect                   # redirect | pipe
+  stream_mode: pipe                       # pipe (default, ADR-0008) | redirect
   cache_while_playing: false
   export_playlists_every: 6h
 outputs:

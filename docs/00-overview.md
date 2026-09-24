@@ -19,7 +19,7 @@ input, controlled from a phone. Read in order; each document cites requirement I
 | 11 | [Roadmap and milestones](11-roadmap-and-milestones.md) | M0 bench verification through M6 extensions |
 | 12 | [Risks and open questions](12-risks-and-open-questions.md) | Risk register, questions for the owner, assumptions |
 | Manual | [User manual](USER-MANUAL.md) | How to install and use what exists today (MPD layer, DAC setup, phone control, Samba import) on any Debian SBC |
-| ADR | [Architecture decision records](adr/) | 0001 MPD engine · 0002 Go service + NetEase library · 0003 PWA first · 0004 tus uploads · 0005 DSD strategy · 0006 output selection · 0007 target board |
+| ADR | [Architecture decision records](adr/) | 0001 MPD engine · 0002 Go service + NetEase library · 0003 PWA first · 0004 tus uploads · 0005 DSD strategy · 0006 output selection · 0007 target board · 0008 stream delivery |
 
 Diagrams are Mermaid blocks inside the documents (03 and 11); GitHub and VS Code render them.
 

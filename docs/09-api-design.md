@@ -196,7 +196,7 @@ reload.
 ```
 GET /settings
 PUT /settings   { "server_name":"Living room", "auth_mode":"admin",
-                  "netease": {"level_preference":["hires","lossless","exhigh"], "stream_mode":"redirect|pipe", "cache_while_playing":false},
+                  "netease": {"level_preference":["hires","lossless","exhigh"], "stream_mode":"pipe|redirect", "cache_while_playing":false},
                   "library": {"music_dir":"/srv/music", "auto_update": true},
                   "discovery": {"mdns": true} }
 ```

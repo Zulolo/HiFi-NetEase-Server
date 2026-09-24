@@ -35,7 +35,15 @@ Original plan, kept for readers repeating it on other hardware:
 Exit criteria: 24 h of 24/192 local playback without dropouts; each dongle's best DSD mode
 known; Wi-Fi outages ≤ 60 s and loss ≤ 2 %, otherwise escalate (USB Wi-Fi adapter, then RV).
 
-## M1 · NetEase via MPD, interim tools · ~1 week
+## M1 · NetEase via MPD, interim tools · step 1 done 2026-09-24
+
+Step 1 result: the NetEase API, the account's entitlement and the end-to-end audio path are
+verified on the board with `ncmctl` v0.8.1 (the ADR-0002 library, arm64 release binary). QR
+login works and the session survives restarts; the SVIP account resolves `jymaster` to FLAC
+24-bit/192 kHz; `hires` degrades to `lossless` on tracks without a Hi-Res master (docs/08 §4).
+Playing a resolved stream exposed the CDN `Content-Type` defect that makes redirect mode
+unusable and pipe mode mandatory — see ADR-0008. With a pipe proxy, MPD delivered the stream
+to the ES9039 dongle as bit-perfect `S24_3LE @ 192000 Hz` at 0.6 % CPU.
 
 Goal: listen to the NetEase library on the Acton IV from the phone, using existing software.
 

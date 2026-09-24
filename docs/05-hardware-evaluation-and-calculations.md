@@ -121,6 +121,7 @@ import speed matters later.
 | Content type | Assumed size | Capacity if used alone |
 |---|---|---|
 | FLAC 16/44.1 (NetEase lossless downloads) | 30 MB/track | ≈ 16,600 tracks |
+| FLAC 24/192 (NetEase `jymaster` 超清母带, measured) | 157 MB/track | ≈ 2,880 tracks |
 | FLAC 24/96 | 90 MB/track | ≈ 5,500 tracks |
 | FLAC 24/192 | 170 MB/track | ≈ 2,900 tracks |
 | DSD64 | 169 MB/track | ≈ 2,950 tracks |

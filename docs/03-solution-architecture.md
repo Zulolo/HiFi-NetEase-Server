@@ -196,6 +196,7 @@ Filesystem layout on the USB disk:
 | ADR-0005 | DSD strategy: native → DoP → dsd2pcm, chosen per output block; hardware mixer or fixed volume for bit-perfect DSD. |
 | ADR-0006 | Output selection = MPD outputs enable/disable with generated per-DAC blocks and udev-stable card names. |
 | ADR-0007 | Primary target board and OS image. |
+| ADR-0008 | NetEase streams are piped through `hifid` with a corrected `Content-Type`, not 302-redirected. |
 
 ## 9. Quality attributes mapped to design
 
