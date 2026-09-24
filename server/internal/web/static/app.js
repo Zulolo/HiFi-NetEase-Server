@@ -160,6 +160,7 @@ let reloadTracks = null;
 
 async function showTracks(id, name) {
   viewingPlaylist = id;
+  bBack.onclick = () => showPlaylists();
   reloadTracks = () => showTracks(id, name);
   refreshDownloads();
   bTitle.textContent = name;
@@ -205,7 +206,6 @@ async function showTracks(id, name) {
   });
 }
 
-bBack.onclick = () => showPlaylists();
 
 fetch(API + "/netease/status")
   .then((r) => r.json())
@@ -251,3 +251,79 @@ dlBtn.onclick = async () => {
 
 refreshDownloads();
 setInterval(refreshDownloads, 5000);
+
+// ---- local library (Samba uploads + NetEase downloads as files) -------------
+// MPD indexes both trees, so one browser covers everything already on disk.
+const tabNcm = $("tab-ncm");
+const tabLib = $("tab-lib");
+const libSearch = $("lib-search");
+let mode = "ncm";
+let libPath = "";
+
+function setMode(m) {
+  mode = m;
+  tabNcm.classList.toggle("on", m === "ncm");
+  tabLib.classList.toggle("on", m === "lib");
+  libSearch.hidden = m !== "lib";
+  dlBtn.hidden = true;
+  if (m === "ncm") { libSearch.value = ""; showPlaylists(); }
+  else { libPath = ""; showLibrary(""); }
+}
+
+function libRow(e) {
+  const li = document.createElement("li");
+  const isDir = e.type === "directory";
+  const sub = isDir ? "folder"
+    : [e.artist, e.album].filter(Boolean).join(" — ") || e.path.replace(/\/[^/]*$/, "");
+  li.innerHTML = `<img alt="">`;
+  const txt = document.createElement("div");
+  txt.className = "txt";
+  txt.innerHTML = `<div class="n">${isDir ? "📁 " : ""}${isDir ? e.name : e.title}</div>`
+    + `<div class="s">${sub}</div>`;
+  li.appendChild(txt);
+  li.onclick = async () => {
+    if (isDir) { showLibrary(e.path); return; }
+    setStatus(`loading "${e.title}"…`);
+    const st = await call("/queue", "POST", {
+      items: [{ ref: "local:" + e.path }], mode: "replace", play: true,
+    });
+    if (st) render(st);
+    setStatus("");
+  };
+  return li;
+}
+
+async function showLibrary(p) {
+  libPath = p;
+  bTitle.textContent = p ? "/" + p : "All music on disk";
+  setStatus("loading…");
+  bList.innerHTML = "";
+  const r = await call("/library?path=" + encodeURIComponent(p), "GET");
+  if (!r) { setStatus("library unavailable"); return; }
+  bBack.hidden = r.at_root;
+  bBack.onclick = () => (r.at_root ? setMode("lib") : showLibrary(r.parent));
+  setStatus(`${r.items.length} item(s)`);
+  r.items.forEach((e) => bList.appendChild(libRow(e)));
+}
+
+async function runLibSearch(q) {
+  bTitle.textContent = `Search: ${q}`;
+  setStatus("searching…");
+  bList.innerHTML = "";
+  const r = await call("/library/search?q=" + encodeURIComponent(q), "GET");
+  if (!r) { setStatus("search failed"); return; }
+  bBack.hidden = false;
+  bBack.onclick = () => showLibrary(libPath);
+  setStatus(`${r.items.length} result(s)`);
+  r.items.forEach((e) => bList.appendChild(libRow(e)));
+}
+
+let searchTimer = null;
+libSearch.oninput = (e) => {
+  const q = e.target.value.trim();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => (q ? runLibSearch(q) : showLibrary(libPath)), 350);
+};
+
+tabNcm.onclick = () => setMode("ncm");
+tabLib.onclick = () => setMode("lib");

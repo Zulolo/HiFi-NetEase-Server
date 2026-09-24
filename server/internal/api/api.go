@@ -92,6 +92,9 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("DELETE /api/v1/queue", g(s.simple(s.pl.Clear)))
 	m.HandleFunc("DELETE /api/v1/queue/{qid}", g(s.delQueueItem))
 
+	m.HandleFunc("GET /api/v1/library", g(s.getLibrary))
+	m.HandleFunc("GET /api/v1/library/search", g(s.searchLibrary))
+
 	m.HandleFunc("GET /api/v1/outputs", g(s.getOutputs))
 	m.HandleFunc("PUT /api/v1/outputs/{id}/active", g(s.setActiveOutput))
 

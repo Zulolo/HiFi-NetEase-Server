@@ -5,7 +5,9 @@ package player
 import (
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -416,4 +418,86 @@ func (p *Player) Update(uri string) error {
 		_, err := c.Update(uri)
 		return err
 	})
+}
+
+// Entry is one row of the local library: a folder or a playable file.
+type Entry struct {
+	Type     string  `json:"type"` // directory | file
+	Path     string  `json:"path"` // relative to music_directory
+	Name     string  `json:"name"`
+	Title    string  `json:"title,omitempty"`
+	Artist   string  `json:"artist,omitempty"`
+	Album    string  `json:"album,omitempty"`
+	Duration float64 `json:"duration,omitempty"`
+}
+
+func entryFrom(a mpd.Attrs) (Entry, bool) {
+	if d, ok := a["directory"]; ok {
+		return Entry{Type: "directory", Path: d, Name: path.Base(d)}, true
+	}
+	f, ok := a["file"]
+	if !ok {
+		return Entry{}, false // playlists and other rows are skipped
+	}
+	e := Entry{
+		Type:     "file",
+		Path:     f,
+		Name:     path.Base(f),
+		Title:    a["Title"],
+		Artist:   a["Artist"],
+		Album:    a["Album"],
+		Duration: atof(a["duration"]),
+	}
+	if e.Title == "" {
+		e.Title = e.Name
+	}
+	return e, true
+}
+
+// Browse lists one directory of the library. An empty uri is the root, which
+// holds the "local" (Samba uploads) and "netease" (downloads) trees.
+func (p *Player) Browse(uri string) ([]Entry, error) {
+	var out []Entry
+	err := p.with(func(c *mpd.Client) error {
+		rows, err := c.ListInfo(uri)
+		if err != nil {
+			return err
+		}
+		out = out[:0]
+		for _, r := range rows {
+			if e, ok := entryFrom(r); ok {
+				out = append(out, e)
+			}
+		}
+		return nil
+	})
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Type != out[j].Type {
+			return out[i].Type == "directory" // folders first
+		}
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out, err
+}
+
+// SearchLibrary does a case-insensitive substring search over any tag.
+func (p *Player) SearchLibrary(query string, limit int) ([]Entry, error) {
+	var out []Entry
+	err := p.with(func(c *mpd.Client) error {
+		rows, err := c.Search("any", query)
+		if err != nil {
+			return err
+		}
+		out = out[:0]
+		for _, r := range rows {
+			if e, ok := entryFrom(r); ok {
+				out = append(out, e)
+				if limit > 0 && len(out) >= limit {
+					break
+				}
+			}
+		}
+		return nil
+	})
+	return out, err
 }

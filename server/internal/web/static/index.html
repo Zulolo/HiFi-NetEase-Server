@@ -43,6 +43,10 @@
   .act.done { color:#54c06e; background:transparent; }
   .syncbar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
   .syncbar .sub { flex:1 1 auto; }
+  .tabs { display:flex; gap:6px; }
+  .tab { flex:0 0 auto; min-width:0; padding:6px 14px; font-size:13px; background:#20262c; color:var(--mut); border-radius:999px; }
+  .tab.on { background:#2f3b46; color:var(--fg); }
+  #lib-search { width:100%; padding:10px; margin-bottom:8px; border:0; border-radius:10px; background:#242a30; color:var(--fg); font-size:15px; }
 </style>
 </head>
 <body>
@@ -75,9 +79,14 @@
 
 <div class="card">
   <div class="hdr">
-    <div class="sub" id="browse-title">NetEase</div>
+    <div class="tabs">
+      <button class="tab on" id="tab-ncm">NetEase</button>
+      <button class="tab" id="tab-lib">Library</button>
+    </div>
     <button id="browse-back" hidden>← Back</button>
   </div>
+  <div class="sub" id="browse-title" style="margin-bottom:6px"></div>
+  <input id="lib-search" placeholder="Search library…" hidden>
   <div class="syncbar">
     <div class="sub" id="dl-status"></div>
     <button class="act" id="dl-playlist" hidden>Download all</button>
