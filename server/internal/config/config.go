@@ -41,10 +41,9 @@ type NetEase struct {
 	StreamLevelPreference []string `yaml:"stream_level_preference"`
 	// StreamMode must stay "pipe": the CDN mislabels FLAC (ADR-0008).
 	StreamMode string `yaml:"stream_mode"`
-	// SyncPaceSeconds spaces downloads so bulk syncing does not trip 风控.
-	SyncPaceSeconds int `yaml:"sync_pace_seconds"`
-	// SyncEveryHours is the background sync interval; 0 disables the loop.
-	SyncEveryHours int `yaml:"sync_every_hours"`
+	// DownloadPaceSeconds spaces queued downloads so a bulk add never hammers
+	// the account (docs/12 R18).
+	DownloadPaceSeconds int `yaml:"download_pace_seconds"`
 }
 
 type MPD struct {
@@ -69,8 +68,7 @@ func Default() *Config {
 			LevelPreference:       []string{"jymaster", "hires", "lossless", "exhigh", "higher", "standard"},
 			StreamLevelPreference: []string{"lossless", "exhigh", "higher", "standard"},
 			StreamMode:            "pipe",
-			SyncPaceSeconds:       15,
-			SyncEveryHours:        6,
+			DownloadPaceSeconds:   5,
 		},
 	}
 }

@@ -68,20 +68,21 @@ func main() {
 		} else {
 			srv.SetNetEase(ncm)
 
-			syncer := netease.NewSyncer(ncm,
-				filepath.Join(stateDir, "sync.json"),
-				time.Duration(cfg.NetEase.SyncPaceSeconds)*time.Second, log)
-			syncer.OnDownloaded = func(rel string) {
+			// The explicit download list: nothing is fetched unless the user
+			// adds it, matching the desktop client (playback stays on the
+			// lower streaming ladder).
+			dlq := netease.NewQueue(ncm,
+				filepath.Join(stateDir, "downloads-queue.json"),
+				time.Duration(cfg.NetEase.DownloadPaceSeconds)*time.Second, log)
+			dlq.OnDownloaded = func(rel string) {
 				if err := pl.Update(filepath.Dir(rel)); err != nil {
-					log.Warn("mpd update after sync download", "path", rel, "err", err)
+					log.Warn("mpd update after download", "path", rel, "err", err)
 				}
 			}
-			srv.SetSyncer(syncer)
-			if cfg.NetEase.SyncEveryHours > 0 {
-				syncCtx, stopSync := context.WithCancel(context.Background())
-				defer stopSync()
-				go syncer.Loop(syncCtx, time.Duration(cfg.NetEase.SyncEveryHours)*time.Hour)
-			}
+			srv.SetQueue(dlq)
+			dlCtx, stopDL := context.WithCancel(context.Background())
+			defer stopDL()
+			go dlq.Run(dlCtx)
 			if p, err := ncm.Profile(context.Background()); err != nil {
 				log.Warn("netease session not usable yet", "err", err)
 			} else {

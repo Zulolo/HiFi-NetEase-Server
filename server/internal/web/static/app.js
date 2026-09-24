@@ -136,7 +136,8 @@ function setStatus(text) {
 
 async function showPlaylists() {
   viewingPlaylist = null;
-  refreshSync();
+  reloadTracks = null;
+  refreshDownloads();
   bTitle.textContent = "NetEase";
   bBack.hidden = true;
   setStatus("loading playlists…");
@@ -155,9 +156,12 @@ async function showPlaylists() {
   });
 }
 
+let reloadTracks = null;
+
 async function showTracks(id, name) {
   viewingPlaylist = id;
-  refreshSync();
+  reloadTracks = () => showTracks(id, name);
+  refreshDownloads();
   bTitle.textContent = name;
   bBack.hidden = false;
   setStatus("loading tracks…");
@@ -178,16 +182,17 @@ async function showTracks(id, name) {
     li.appendChild(txt);
 
     const dl = document.createElement("button");
+    const queued = queuedIDs.has(t.id);
     dl.className = "act" + (t.on_disk ? " done" : "");
-    dl.textContent = t.on_disk ? "✓" : "↓";
-    dl.title = t.on_disk ? "already on disk" : "download for offline play";
+    dl.textContent = t.on_disk ? "✓" : queued ? "⋯" : "↓";
+    dl.title = t.on_disk ? "on disk" : queued ? "in the download list" : "add to the download list";
     dl.onclick = async (e) => {
       e.stopPropagation();
-      if (dl.classList.contains("done")) return;
+      if (t.on_disk) return;
       dl.textContent = "…";
-      const ok = await call("/netease/download", "POST", { ref: t.ref });
-      dl.textContent = ok ? "✓" : "!";
-      if (ok) dl.classList.add("done");
+      const r = await call("/netease/download", "POST", { ref: t.ref });
+      dl.textContent = r && r.on_disk ? "✓" : "⋯";
+      refreshDownloads();
     };
     li.appendChild(dl);
 
@@ -210,48 +215,39 @@ fetch(API + "/netease/status")
   })
   .catch(() => setStatus("NetEase unavailable."));
 
-// ---- offline sync -----------------------------------------------------------
-const syncLine = $("sync-status");
-const syncBtn = $("sync-toggle");
-let syncSubs = [];
+
+// ---- download list ---------------------------------------------------------
+// Nothing downloads by itself. Playing streams at the lower quality ladder;
+// only what is added here is fetched, at the download ladder. Same split as
+// the desktop client's 音质播放设置 / 音质下载设置.
+const dlLine = $("dl-status");
+const dlBtn = $("dl-playlist");
 let viewingPlaylist = null;
+let queuedIDs = new Set();
 
-function renderSyncLine(s) {
-  if (!s) { syncLine.textContent = ""; return; }
-  syncSubs = s.playlists || [];
-  const bits = [`${s.total_on_disk} tracks on disk`];
-  if (s.running) {
-    bits.push(`syncing: ${s.current || "…"} (${s.downloaded_this_run} done`
-      + (s.failed_this_run ? `, ${s.failed_this_run} failed` : "") + ")");
-  } else if (s.playlists && s.playlists.length) {
-    bits.push(`${s.playlists.length} playlist(s) kept offline`);
-  }
-  syncLine.textContent = bits.join(" · ");
-  if (viewingPlaylist !== null) {
-    const on = syncSubs.includes(viewingPlaylist);
-    syncBtn.hidden = false;
-    syncBtn.textContent = on ? "Stop syncing" : "Sync offline";
-    syncBtn.classList.toggle("done", on);
-  } else {
-    syncBtn.hidden = true;
-  }
+function renderDownloads(s) {
+  if (!s) { dlLine.textContent = ""; return; }
+  queuedIDs = new Set((s.pending || []).map((i) => i.id));
+  const bits = [`${s.total_on_disk} on disk`];
+  if (s.current) bits.push(`downloading: ${s.current}`);
+  if (s.pending && s.pending.length) bits.push(`${s.pending.length} queued`);
+  if (s.failed && s.failed.length) bits.push(`${s.failed.length} failed`);
+  dlLine.textContent = bits.join(" · ");
+  dlBtn.hidden = viewingPlaylist === null;
 }
 
-async function refreshSync() {
-  renderSyncLine(await call("/netease/sync", "GET"));
+async function refreshDownloads() {
+  renderDownloads(await call("/netease/downloads", "GET"));
 }
 
-syncBtn.onclick = async () => {
+dlBtn.onclick = async () => {
   if (viewingPlaylist === null) return;
-  const on = syncSubs.includes(viewingPlaylist);
-  syncBtn.textContent = "…";
-  const s = await call("/netease/sync/subscribe", "POST", {
-    playlist_id: viewingPlaylist, remove: on,
-  });
-  renderSyncLine(s);
-  if (!on) await call("/netease/sync/run", "POST", {}); // start straight away
-  setTimeout(refreshSync, 1500);
+  const label = dlBtn.textContent;
+  dlBtn.textContent = "…";
+  const r = await call("/netease/download/playlist", "POST", { playlist_id: viewingPlaylist });
+  dlBtn.textContent = label;
+  if (r) { await refreshDownloads(); if (typeof reloadTracks === "function") reloadTracks(); }
 };
 
-refreshSync();
-setInterval(refreshSync, 10000); // sync is slow; a slow poll is plenty
+refreshDownloads();
+setInterval(refreshDownloads, 5000);

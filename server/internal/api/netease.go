@@ -1,9 +1,7 @@
 package api
 
 import (
-	"context"
 	"net/http"
-	"path"
 	"strconv"
 
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
@@ -98,12 +96,21 @@ func queryInt(r *http.Request, name string, def int) int {
 	return n
 }
 
-// SetSyncer attaches the offline sync scheduler (docs/08 §7.1).
-func (s *Server) SetSyncer(sy *netease.Syncer) { s.sync = sy }
+// SetQueue attaches the explicit download list.
+func (s *Server) SetQueue(q *netease.Queue) { s.dl = q }
 
-// ncmDownload fetches one song to disk at the best granted level (FR-1.5).
+func (s *Server) dlReady(w http.ResponseWriter) bool {
+	if s.dl == nil {
+		writeErr(w, http.StatusServiceUnavailable, "download_disabled", "downloads are not enabled")
+		return false
+	}
+	return true
+}
+
+// ncmDownload adds one song to the download list and returns immediately.
+// A jymaster track is ~157 MB, so the fetch must never block the request.
 func (s *Server) ncmDownload(w http.ResponseWriter, r *http.Request) {
-	if !s.ncmReady(w) {
+	if !s.ncmReady(w) || !s.dlReady(w) {
 		return
 	}
 	var req struct {
@@ -118,68 +125,51 @@ func (s *Server) ncmDownload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "ref must look like ncm:<id>")
 		return
 	}
-	rel, err := s.ncm.Download(r.Context(), id)
-	if err != nil {
-		writeErr(w, http.StatusBadGateway, "ncm_download_failed", err.Error())
+	if rel, on := s.ncm.LocalPath(id); on {
+		writeJSON(w, http.StatusOK, map[string]any{"ref": req.Ref, "queued": false, "on_disk": true, "path": rel})
 		return
 	}
-	// let MPD see the new file straight away
-	if err := s.pl.Update(path.Dir(rel)); err != nil && s.log != nil {
-		s.log.Warn("mpd update after download", "path", rel, "err", err)
+	item := netease.Item{ID: id}
+	if t, err := s.ncm.TrackInfo(r.Context(), id); err == nil {
+		item.Title, item.Artist = t.Title, t.Artist
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ref": req.Ref, "path": rel, "on_disk": true})
+	added := s.dl.Add(item)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"ref": req.Ref, "queued": added > 0, "on_disk": false, "pending": s.dl.Pending(),
+	})
 }
 
-func (s *Server) syncReady(w http.ResponseWriter) bool {
-	if s.sync == nil {
-		writeErr(w, http.StatusServiceUnavailable, "sync_disabled", "offline sync is not enabled")
-		return false
-	}
-	return true
-}
-
-func (s *Server) syncStatus(w http.ResponseWriter, r *http.Request) {
-	if !s.syncReady(w) {
-		return
-	}
-	writeJSON(w, http.StatusOK, s.sync.Status())
-}
-
-// syncSubscribe adds or removes a playlist from the offline set.
-func (s *Server) syncSubscribe(w http.ResponseWriter, r *http.Request) {
-	if !s.syncReady(w) {
+// ncmDownloadPlaylist queues a whole playlist in one explicit action.
+func (s *Server) ncmDownloadPlaylist(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) || !s.dlReady(w) {
 		return
 	}
 	var req struct {
 		PlaylistID int64 `json:"playlist_id"`
-		Remove     bool  `json:"remove"`
 	}
 	if err := decode(r, &req); err != nil || req.PlaylistID == 0 {
 		writeErr(w, http.StatusBadRequest, "bad_request", "playlist_id is required")
 		return
 	}
-	var err error
-	if req.Remove {
-		err = s.sync.Unsubscribe(req.PlaylistID)
-	} else {
-		err = s.sync.Subscribe(req.PlaylistID)
-	}
+	added, err := s.dl.AddPlaylist(r.Context(), req.PlaylistID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "sync_error", err.Error())
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, s.sync.Status())
+	writeJSON(w, http.StatusAccepted, map[string]any{"added": added, "pending": s.dl.Pending()})
 }
 
-// syncRun kicks a pass immediately instead of waiting for the timer.
-func (s *Server) syncRun(w http.ResponseWriter, r *http.Request) {
-	if !s.syncReady(w) {
+func (s *Server) ncmDownloads(w http.ResponseWriter, r *http.Request) {
+	if !s.dlReady(w) {
 		return
 	}
-	go func() {
-		if err := s.sync.RunOnce(context.Background()); err != nil && s.log != nil {
-			s.log.Warn("manual sync run", "err", err)
-		}
-	}()
-	writeJSON(w, http.StatusAccepted, s.sync.Status())
+	writeJSON(w, http.StatusOK, s.dl.Status())
+}
+
+func (s *Server) ncmDownloadsClear(w http.ResponseWriter, r *http.Request) {
+	if !s.dlReady(w) {
+		return
+	}
+	s.dl.Clear()
+	writeJSON(w, http.StatusOK, s.dl.Status())
 }

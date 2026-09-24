@@ -215,7 +215,22 @@ for each song (concurrency 2, polite):
 - Users who already have `.ncm` files from the official client can convert them on the PC
   with an open-source `ncmdump` tool before uploading; `hifid` does not decrypt `.ncm`.
 
-### 7.1 Offline sync (FR-1.7): keeping playlists on disk automatically
+### 7.1 The download list (FR-1.7): explicit, never automatic
+
+The desktop client separates *playback* quality from *download* quality, and downloads only
+what the user puts in its 下载列表. `hifid` mirrors that, by owner decision on 2026-09-24:
+
+- Playing a track, or having it in a playlist, downloads nothing. Live playback streams at
+  `stream_level_preference` (lossless by default, which fits the link — docs/05 §7).
+- `POST /netease/download` adds one song to the list; `POST /netease/download/playlist` adds
+  every not-yet-downloaded track of a playlist in one deliberate action.
+- A single worker drains the list, one song at a time, at `level_preference` (jymaster first),
+  with `download_pace_seconds` between fetches so a bulk add never hammers the account
+  (docs/12 R18). It retries a song up to three times before parking it in a failed list.
+- The list is persisted (`downloads-queue.json`), so a restart resumes rather than restarts,
+  and a song already on disk is skipped rather than fetched twice.
+- Each finished file triggers an incremental MPD update, so it appears in the library within
+  seconds, and `POST /queue` with that `ncm:` ref then enqueues the plain `local:` path.
 
 The main mode of use is playback from local files on an always-on box, so the download
 pipeline is driven by a scheduler rather than only by manual taps:
