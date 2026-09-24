@@ -82,7 +82,19 @@ func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
 	// A downloaded copy always wins: MPD reads it straight off the disk, at
 	// full quality, seekable, with no network in the audio path.
 	if rel, ok := s.ncm.LocalPath(id); ok {
-		return s.pl.AddTagged(rel, nil)
+		qid, err := s.pl.AddTagged(rel, nil)
+		if err == nil {
+			return qid, nil
+		}
+		// The file is on disk but MPD has not indexed it (a scan still
+		// running, or the file moved and the database went stale). Ask for a
+		// rescan and stream this time rather than failing the request.
+		if uerr := s.pl.Update(topSegment(rel)); uerr != nil && s.log != nil {
+			s.log.Warn("mpd rescan after local add failed", "path", rel, "err", uerr)
+		}
+		if s.log != nil {
+			s.log.Warn("local copy not playable yet, streaming instead", "path", rel, "err", err)
+		}
 	}
 	// Metadata is best-effort: a tagging failure must not stop playback.
 	tags := map[string]string{}
@@ -110,4 +122,14 @@ func net_SplitHostPort(addr string) (string, string, error) {
 		return addr, "", fmt.Errorf("no port in %q", addr)
 	}
 	return addr[:i], addr[i+1:], nil
+}
+
+// topSegment returns the first path element ("netease"), which is ASCII by
+// construction. MPD 0.23 fails to update a sub-path containing non-ASCII
+// characters, so rescans are always aimed at an ASCII ancestor.
+func topSegment(rel string) string {
+	if i := strings.IndexByte(rel, '/'); i > 0 {
+		return rel[:i]
+	}
+	return rel
 }
