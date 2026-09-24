@@ -26,15 +26,24 @@ var ErrNotLoggedIn = errors.New("netease: not logged in")
 type Config struct {
 	// StateDir holds the cookie jar and the library's own state files.
 	StateDir string
-	// Levels is the quality ladder, best first (docs/08 §4).
-	Levels  []string
-	Timeout time.Duration
+	// MusicDir is the root of the music tree; downloads land in <MusicDir>/netease.
+	MusicDir string
+	// Levels is the download ladder, best first (docs/08 §4).
+	Levels []string
+	// StreamLevels is the ladder for live playback. It is deliberately lower
+	// than Levels: a 24/192 master needs ~690 kB/s sustained, more than a
+	// 2.4 GHz link reliably carries, and a starved decoder stutters.
+	StreamLevels []string
+	Timeout      time.Duration
 }
 
 type Client struct {
-	we     *weapi.Api
-	raw    *api.Client
-	levels []types.Level
+	we           *weapi.Api
+	raw          *api.Client
+	levels       []types.Level
+	streamLevels []types.Level
+	musicDir     string
+	idx          *index
 
 	mu      sync.RWMutex
 	urls    map[int64]cachedURL
@@ -85,6 +94,13 @@ func DefaultLevels() []string {
 	return []string{"jymaster", "hires", "lossless", "exhigh", "higher", "standard"}
 }
 
+// DefaultStreamLevels starts at lossless on purpose. Live playback is limited
+// by the link, not by entitlement: lossless needs ~124 kB/s where a jymaster
+// master needs ~690 kB/s. Downloads still use the full ladder.
+func DefaultStreamLevels() []string {
+	return []string{"lossless", "exhigh", "higher", "standard"}
+}
+
 func New(cfg Config) (*Client, error) {
 	if cfg.StateDir == "" {
 		return nil, errors.New("netease: StateDir is required")
@@ -96,14 +112,18 @@ func New(cfg Config) (*Client, error) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-	levels := cfg.Levels
-	if len(levels) == 0 {
-		levels = DefaultLevels()
+	toLadder := func(in []string, def []string) []types.Level {
+		if len(in) == 0 {
+			in = def
+		}
+		out := make([]types.Level, 0, len(in))
+		for _, l := range in {
+			out = append(out, types.Level(l))
+		}
+		return out
 	}
-	ladder := make([]types.Level, 0, len(levels))
-	for _, l := range levels {
-		ladder = append(ladder, types.Level(l))
-	}
+	ladder := toLadder(cfg.Levels, DefaultLevels())
+	streamLadder := toLadder(cfg.StreamLevels, DefaultStreamLevels())
 
 	raw, err := api.NewClient(&api.Config{
 		Timeout: timeout,
@@ -117,11 +137,18 @@ func New(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("netease: client: %w", err)
 	}
+	idx, err := openIndex(filepath.Join(cfg.StateDir, "downloads.json"))
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
-		we:     weapi.New(raw),
-		raw:    raw,
-		levels: ladder,
-		urls:   make(map[int64]cachedURL),
+		we:           weapi.New(raw),
+		raw:          raw,
+		levels:       ladder,
+		streamLevels: streamLadder,
+		musicDir:     cfg.MusicDir,
+		idx:          idx,
+		urls:         make(map[int64]cachedURL),
 	}, nil
 }
 
@@ -174,6 +201,8 @@ type Track struct {
 	Album    string  `json:"album"`
 	Cover    string  `json:"cover,omitempty"`
 	Duration float64 `json:"duration"`
+	// OnDisk means a downloaded copy exists, so playback needs no network.
+	OnDisk bool `json:"on_disk"`
 }
 
 // Playlists lists the account's own and subscribed playlists (FR-1.3).
@@ -256,6 +285,7 @@ func (c *Client) PlaylistTracks(ctx context.Context, id int64, offset, limit int
 	out := make([]Track, 0, len(page))
 	for _, t := range page {
 		if tr, ok := byID[t.Id]; ok {
+			_, tr.OnDisk = c.LocalPath(tr.ID)
 			out = append(out, tr)
 		}
 	}
@@ -265,16 +295,28 @@ func (c *Client) PlaylistTracks(ctx context.Context, id int64, offset, limit int
 // Resolve walks the quality ladder and returns the first level the account is
 // actually granted. The granted level is read back from the response because it
 // is not a monotonic function of the request (docs/08 §4).
+// Resolve picks a URL for live streaming (the lower ladder).
 func (c *Client) Resolve(ctx context.Context, id int64) (Resolved, error) {
-	c.mu.RLock()
-	if hit, ok := c.urls[id]; ok && time.Now().Before(hit.expires) {
+	return c.resolve(ctx, id, c.streamLevels, true)
+}
+
+// ResolveBest picks the highest level the account is granted, for downloading.
+func (c *Client) ResolveBest(ctx context.Context, id int64) (Resolved, error) {
+	return c.resolve(ctx, id, c.levels, false)
+}
+
+func (c *Client) resolve(ctx context.Context, id int64, ladder []types.Level, useCache bool) (Resolved, error) {
+	if useCache {
+		c.mu.RLock()
+		hit, ok := c.urls[id]
 		c.mu.RUnlock()
-		return hit.res, nil
+		if ok && time.Now().Before(hit.expires) {
+			return hit.res, nil
+		}
 	}
-	c.mu.RUnlock()
 
 	var lastErr error
-	for _, level := range c.levels {
+	for _, level := range ladder {
 		resp, err := c.we.SongPlayerV1(ctx, &weapi.SongPlayerV1Req{
 			Ids:        types.IntsString{id},
 			Level:      level,
@@ -311,9 +353,11 @@ func (c *Client) Resolve(ctx context.Context, id int64) (Resolved, error) {
 		if ttl > time.Minute {
 			ttl -= time.Minute
 		}
-		c.mu.Lock()
-		c.urls[id] = cachedURL{res: res, expires: time.Now().Add(ttl)}
-		c.mu.Unlock()
+		if useCache {
+			c.mu.Lock()
+			c.urls[id] = cachedURL{res: res, expires: time.Now().Add(ttl)}
+			c.mu.Unlock()
+		}
 		return res, nil
 	}
 	if lastErr == nil {

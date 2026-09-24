@@ -56,14 +56,32 @@ func main() {
 	// NetEase adapter (ADR-0002). A failure here must not stop local playback
 	// (NFR-6): hifid logs it and serves everything else.
 	if cfg.NetEase.Enabled {
+		stateDir := filepath.Join(cfg.Paths.Data, "netease")
 		ncm, err := netease.New(netease.Config{
-			StateDir: filepath.Join(cfg.Paths.Data, "netease"),
-			Levels:   cfg.NetEase.LevelPreference,
+			StateDir:     stateDir,
+			MusicDir:     cfg.Paths.Music,
+			Levels:       cfg.NetEase.LevelPreference,
+			StreamLevels: cfg.NetEase.StreamLevelPreference,
 		})
 		if err != nil {
 			log.Error("netease adapter unavailable", "err", err)
 		} else {
 			srv.SetNetEase(ncm)
+
+			syncer := netease.NewSyncer(ncm,
+				filepath.Join(stateDir, "sync.json"),
+				time.Duration(cfg.NetEase.SyncPaceSeconds)*time.Second, log)
+			syncer.OnDownloaded = func(rel string) {
+				if err := pl.Update(filepath.Dir(rel)); err != nil {
+					log.Warn("mpd update after sync download", "path", rel, "err", err)
+				}
+			}
+			srv.SetSyncer(syncer)
+			if cfg.NetEase.SyncEveryHours > 0 {
+				syncCtx, stopSync := context.WithCancel(context.Background())
+				defer stopSync()
+				go syncer.Loop(syncCtx, time.Duration(cfg.NetEase.SyncEveryHours)*time.Hour)
+			}
 			if p, err := ncm.Profile(context.Background()); err != nil {
 				log.Warn("netease session not usable yet", "err", err)
 			} else {

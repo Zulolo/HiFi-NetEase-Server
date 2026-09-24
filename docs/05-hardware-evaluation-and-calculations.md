@@ -208,7 +208,7 @@ Mitigations for the expensive case (designed in docs/04):
 |---|---|---|
 | Local playback (the main mode) | 0 | files on the flash drive; Wi-Fi is not in the audio path |
 | NetEase background download (lossless ≈ 30 MB/track) | 3–10 MB/s on Wi-Fi 5 | a few seconds per track; overnight syncs of whole playlists are easy |
-| NetEase live streaming (when used) | 1–9 Mbps | trivial bandwidth; Wi-Fi hiccups are absorbed by MPD's 16 MB buffer (≈ 30 s at 24/96) |
+| NetEase live streaming (measured 2026-09-24) | link sustains ≈ 560–610 kB/s (4.5–4.9 Mbps) | enough for `lossless` (124 kB/s) with a wide margin, **not** for a `jymaster` 24/192 master (690 kB/s), which starves the decoder and logs `Decoder is too slow`. Hence the separate streaming ladder in docs/08 §5; buffers delay a sustained deficit, they do not cure it |
 | PWA control traffic | < 10 kbps | WebSocket state events; suffers only when the link drops entirely (watchdog) |
 | Samba copy over the Zero 3's Wi-Fi 5 (5 GHz) | ≈ 5–15 MB/s | a 4 GB DSD album in 5–15 min; a 500 MB FLAC album in about a minute |
 | Same on 2.4 GHz or with a weak driver (e.g. XR819) | 1–3 MB/s | plan bulk imports near the router |

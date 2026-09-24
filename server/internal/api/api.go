@@ -22,6 +22,7 @@ type Server struct {
 	started time.Time
 	version string
 	ncm     *netease.Client
+	sync    *netease.Syncer
 
 	hub *hub
 }
@@ -97,6 +98,10 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("GET /api/v1/netease/status", g(s.ncmStatus))
 	m.HandleFunc("GET /api/v1/netease/playlists", g(s.ncmPlaylists))
 	m.HandleFunc("GET /api/v1/netease/playlists/{id}/tracks", g(s.ncmPlaylistTracks))
+	m.HandleFunc("POST /api/v1/netease/download", g(s.ncmDownload))
+	m.HandleFunc("GET /api/v1/netease/sync", g(s.syncStatus))
+	m.HandleFunc("POST /api/v1/netease/sync/subscribe", g(s.syncSubscribe))
+	m.HandleFunc("POST /api/v1/netease/sync/run", g(s.syncRun))
 
 	// MPD fetches this; it is loopback-only and carries no token (docs/08 §5).
 	m.HandleFunc("GET /stream/ncm/{id}", s.ncmStream)

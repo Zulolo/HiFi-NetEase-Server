@@ -35,8 +35,16 @@ type NetEase struct {
 	Enabled bool `yaml:"enabled"`
 	// LevelPreference is the quality ladder, best first (docs/08 §4).
 	LevelPreference []string `yaml:"level_preference"`
+	// StreamLevelPreference is the ladder for LIVE playback. It is lower than
+	// LevelPreference on purpose: a 24/192 master needs ~690 kB/s sustained,
+	// more than a 2.4 GHz link carries, and a starved decoder stutters.
+	StreamLevelPreference []string `yaml:"stream_level_preference"`
 	// StreamMode must stay "pipe": the CDN mislabels FLAC (ADR-0008).
 	StreamMode string `yaml:"stream_mode"`
+	// SyncPaceSeconds spaces downloads so bulk syncing does not trip 风控.
+	SyncPaceSeconds int `yaml:"sync_pace_seconds"`
+	// SyncEveryHours is the background sync interval; 0 disables the loop.
+	SyncEveryHours int `yaml:"sync_every_hours"`
 }
 
 type MPD struct {
@@ -58,8 +66,11 @@ func Default() *Config {
 		MPD: MPD{Socket: "/run/mpd/socket", Host: "127.0.0.1", Port: 6600},
 		NetEase: NetEase{
 			Enabled:         true,
-			LevelPreference: []string{"jymaster", "hires", "lossless", "exhigh", "higher", "standard"},
-			StreamMode:      "pipe",
+			LevelPreference:       []string{"jymaster", "hires", "lossless", "exhigh", "higher", "standard"},
+			StreamLevelPreference: []string{"lossless", "exhigh", "higher", "standard"},
+			StreamMode:            "pipe",
+			SyncPaceSeconds:       15,
+			SyncEveryHours:        6,
 		},
 	}
 }

@@ -1,6 +1,8 @@
 package netease
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -61,9 +63,11 @@ func (c *Client) ServeStream(w http.ResponseWriter, r *http.Request, id int64, l
 	if r.Method == http.MethodHead {
 		return
 	}
-	if _, err := io.Copy(w, upstream.Body); err != nil && log != nil {
+	// 8 MB of read-ahead (64 x 128 kB) rides out Wi-Fi stalls.
+	pf := newPrefetch(r.Context(), upstream.Body, 128<<10, 64)
+	if _, err := pf.WriteTo(w); err != nil && log != nil {
 		// a client that seeks or skips closes the socket: that is normal
-		log.Debug("ncm stream copy ended", "song", id, "err", err)
+		log.Debug("ncm stream ended", "song", id, "err", err)
 	}
 }
 
@@ -97,4 +101,73 @@ var streamHTTP = &http.Client{
 		TLSHandshakeTimeout:   15 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 	},
+}
+
+// prefetch decouples MPD's reads from network jitter: a goroutine pulls from
+// the CDN as fast as the link allows into a bounded in-memory queue, and the
+// HTTP handler drains that queue. It cannot cure a sustained bandwidth deficit
+// (for that, stream a lower level or play a downloaded copy), but it absorbs
+// the stalls that otherwise show up as "Decoder is too slow" in the MPD log.
+type prefetch struct {
+	chunks chan []byte
+	err    chan error
+	cancel func()
+}
+
+func newPrefetch(ctx context.Context, src io.Reader, chunk, depth int) *prefetch {
+	if chunk <= 0 {
+		chunk = 128 << 10
+	}
+	if depth <= 0 {
+		depth = 64
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	p := &prefetch{
+		chunks: make(chan []byte, depth),
+		err:    make(chan error, 1),
+		cancel: cancel,
+	}
+	go func() {
+		defer close(p.chunks)
+		for {
+			buf := make([]byte, chunk)
+			n, err := io.ReadFull(src, buf)
+			if n > 0 {
+				select {
+				case p.chunks <- buf[:n]:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if err != nil {
+				if !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+					p.err <- err
+				}
+				return
+			}
+		}
+	}()
+	return p
+}
+
+// WriteTo drains the queue into w.
+func (p *prefetch) WriteTo(w io.Writer) (int64, error) {
+	defer p.cancel()
+	var total int64
+	for b := range p.chunks {
+		n, err := w.Write(b)
+		total += int64(n)
+		if err != nil {
+			return total, err
+		}
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}
+	select {
+	case err := <-p.err:
+		return total, err
+	default:
+		return total, nil
+	}
 }

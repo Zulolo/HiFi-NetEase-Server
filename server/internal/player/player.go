@@ -408,3 +408,12 @@ func (p *Player) AddTagged(uri string, tags map[string]string) (int, error) {
 	})
 	return qid, err
 }
+
+// Update asks MPD to rescan uri (a path relative to music_directory, or "" for
+// everything). Downloads call this so a new file appears in the library.
+func (p *Player) Update(uri string) error {
+	return p.with(func(c *mpd.Client) error {
+		_, err := c.Update(uri)
+		return err
+	})
+}

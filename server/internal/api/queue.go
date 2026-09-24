@@ -79,6 +79,11 @@ func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("bad ref %q", ref)
 	}
+	// A downloaded copy always wins: MPD reads it straight off the disk, at
+	// full quality, seekable, with no network in the audio path.
+	if rel, ok := s.ncm.LocalPath(id); ok {
+		return s.pl.AddTagged(rel, nil)
+	}
 	// Metadata is best-effort: a tagging failure must not stop playback.
 	tags := map[string]string{}
 	if t, err := s.ncm.TrackInfo(r.Context(), id); err == nil {
@@ -86,8 +91,7 @@ func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
 		tags["Artist"] = t.Artist
 		tags["Album"] = t.Album
 	}
-	uri := s.streamURL(id)
-	return s.pl.AddTagged(uri, tags)
+	return s.pl.AddTagged(s.streamURL(id), tags)
 }
 
 // streamURL is the loopback address MPD fetches from. MPD runs on the same

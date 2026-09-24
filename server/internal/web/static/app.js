@@ -135,6 +135,8 @@ function setStatus(text) {
 }
 
 async function showPlaylists() {
+  viewingPlaylist = null;
+  refreshSync();
   bTitle.textContent = "NetEase";
   bBack.hidden = true;
   setStatus("loading playlists…");
@@ -154,6 +156,8 @@ async function showPlaylists() {
 }
 
 async function showTracks(id, name) {
+  viewingPlaylist = id;
+  refreshSync();
   bTitle.textContent = name;
   bBack.hidden = false;
   setStatus("loading tracks…");
@@ -164,14 +168,33 @@ async function showTracks(id, name) {
     return;
   }
   setStatus(`${r.items.length} of ${r.total} tracks`);
+  const count = () => setStatus(` of  tracks`);
   r.items.forEach((t) => {
     const li = document.createElement("li");
-    li.innerHTML = `${img(t.cover)}<div class="txt"><div class="n">${t.title}</div><div class="s">${t.artist}</div></div>`;
-    li.onclick = async () => {
-      setStatus(`loading "${t.title}"…`);
+    const txt = document.createElement("div");
+    txt.className = "txt";
+    txt.innerHTML = `<div class="n"></div><div class="s"></div>`;
+    li.innerHTML = img(t.cover);
+    li.appendChild(txt);
+
+    const dl = document.createElement("button");
+    dl.className = "act" + (t.on_disk ? " done" : "");
+    dl.textContent = t.on_disk ? "✓" : "↓";
+    dl.title = t.on_disk ? "already on disk" : "download for offline play";
+    dl.onclick = async (e) => {
+      e.stopPropagation();
+      if (dl.classList.contains("done")) return;
+      dl.textContent = "…";
+      const ok = await call("/netease/download", "POST", { ref: t.ref });
+      dl.textContent = ok ? "✓" : "!";
+      if (ok) dl.classList.add("done");
+    };
+    li.appendChild(dl);
+
+    txt.onclick = async () => {
+      setStatus(`loading ""…`);
       const st = await call("/queue", "POST", { items: [{ ref: t.ref }], mode: "replace", play: true });
-      if (st) { render(st); setStatus(`${r.items.length} of ${r.total} tracks`); }
-      else setStatus(`could not play "${t.title}"`);
+      if (st) { render(st); count(); } else setStatus(`could not play ""`);
     };
     bList.appendChild(li);
   });
@@ -186,3 +209,49 @@ fetch(API + "/netease/status")
     else setStatus("NetEase not logged in on the server.");
   })
   .catch(() => setStatus("NetEase unavailable."));
+
+// ---- offline sync -----------------------------------------------------------
+const syncLine = $("sync-status");
+const syncBtn = $("sync-toggle");
+let syncSubs = [];
+let viewingPlaylist = null;
+
+function renderSyncLine(s) {
+  if (!s) { syncLine.textContent = ""; return; }
+  syncSubs = s.playlists || [];
+  const bits = [`${s.total_on_disk} tracks on disk`];
+  if (s.running) {
+    bits.push(`syncing: ${s.current || "…"} (${s.downloaded_this_run} done`
+      + (s.failed_this_run ? `, ${s.failed_this_run} failed` : "") + ")");
+  } else if (s.playlists && s.playlists.length) {
+    bits.push(`${s.playlists.length} playlist(s) kept offline`);
+  }
+  syncLine.textContent = bits.join(" · ");
+  if (viewingPlaylist !== null) {
+    const on = syncSubs.includes(viewingPlaylist);
+    syncBtn.hidden = false;
+    syncBtn.textContent = on ? "Stop syncing" : "Sync offline";
+    syncBtn.classList.toggle("done", on);
+  } else {
+    syncBtn.hidden = true;
+  }
+}
+
+async function refreshSync() {
+  renderSyncLine(await call("/netease/sync", "GET"));
+}
+
+syncBtn.onclick = async () => {
+  if (viewingPlaylist === null) return;
+  const on = syncSubs.includes(viewingPlaylist);
+  syncBtn.textContent = "…";
+  const s = await call("/netease/sync/subscribe", "POST", {
+    playlist_id: viewingPlaylist, remove: on,
+  });
+  renderSyncLine(s);
+  if (!on) await call("/netease/sync/run", "POST", {}); // start straight away
+  setTimeout(refreshSync, 1500);
+};
+
+refreshSync();
+setInterval(refreshSync, 10000); // sync is slow; a slow poll is plenty

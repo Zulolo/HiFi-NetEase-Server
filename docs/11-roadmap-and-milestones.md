@@ -79,6 +79,14 @@ Measured end to end: queueing `ncm:22605222` played the `jymaster` master as
 18 MB RSS while relaying the stream — so keeping the proxy in the audio path (ADR-0008) is
 comfortably affordable. `mpc playlist` showed "Radiohead - Creep", confirming `addtagid`.
 
+Downloads and offline sync landed on 2026-09-24 after live streaming stuttered: the link
+sustains ≈ 560–610 kB/s but a `jymaster` master needs ≈ 690 kB/s, so MPD starved. `hifid` now
+downloads at the best granted level into `/srv/music/netease/<Artist>/<Album>/`, tags with
+`ffmpeg -c copy`, indexes what is on disk, prefers the local file when queueing an `ncm:` ref,
+streams live at a lower ladder, and reads ahead 8 MB in the proxy. A paced syncer keeps
+subscribed playlists on disk. Verified: the downloaded master plays as `S24_3LE @ 192000` with
+zero underruns, where the same track streamed live produced repeated xruns.
+
 Remaining for M2: QR login inside `hifid` (the library exposes `QrcodeCreateKey` /
 `QrcodeGenerate` / `QrcodeCheck`; the session is currently seeded from an `ncmctl` login),
 search and daily recommendations, cloud disk, playlist export to `playlists/NetEase/*.m3u`,

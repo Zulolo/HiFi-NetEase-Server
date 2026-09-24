@@ -156,6 +156,19 @@ else
   0.6 % CPU and 80 MB RSS.
 - Redirect mode stays available as a config switch for lossy-only setups and for debugging.
   It is cheaper, but it must not be the default.
+- **Live streaming uses a lower ladder than downloading.** Measured on the deployed board on
+  2026-09-24: the link sustains ≈ 560–610 kB/s to the CDN, while a `jymaster` 24/192 master
+  needs ≈ 690 kB/s continuously. Streaming one therefore starves the decoder, and MPD logs
+  `alsa_output: Decoder is too slow; playing silence to avoid xrun` every few seconds. No
+  buffer size fixes a sustained deficit — it only delays the first dropout. So `hifid` keeps
+  two ladders: `level_preference` (downloads, `jymaster` first) and `stream_level_preference`
+  (live, `lossless` first at ≈ 124 kB/s, a 4–5× margin on the same link).
+- The proxy also reads ahead: a goroutine pulls from the CDN into a bounded 8 MB queue that the
+  HTTP handler drains, so ordinary Wi-Fi jitter never reaches MPD. This absorbs stalls; it does
+  not create bandwidth.
+- A downloaded copy always wins. `POST /queue` with an `ncm:` ref checks the download index
+  first and enqueues the plain `local:` path, so MPD reads the file from disk at full quality,
+  seekable, with no network in the audio path at all.
 - Tags: MPD reads tags from the FLAC/MP3 stream, but NetEase files often carry sparse tags.
   After `addid`, `hifid` issues MPD `addtagid` for Title, Artist, Album, Track, Date and stores
   the cover URL in its own queue-metadata map keyed by MPD song id. This is the officially
