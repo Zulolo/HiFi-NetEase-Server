@@ -198,6 +198,7 @@ If a DAC misbehaves with the quirk (mis-clocked playback), remove
 | Samba asks for a password again and again | `sudo smbpasswd -a hifi` to set a new one, or use `\\ip\music` with the user `hifi` |
 | DSD plays as PCM | `grep -o DSD_U32_BE /proc/asound/card*/stream0` empty → run `sudo ./dac-setup.sh --try-native-dsd`; DoP needs the DAC to accept the container rate (see §8) |
 | New files do not appear | `mpc update`; check permissions (`ls -l /srv/music/local`), files must be group `audio` readable |
+| Load average stays at 1.0 while idle | Some out-of-tree Wi-Fi drivers (e.g. Unisoc UWE5622 on Orange Pi boards: kernel thread `SPRDWL_TX_QUEUE` in state D) inflate the load average without using CPU; `top` shows the CPU 97 % idle. Harmless |
 
 ## 10. Uninstall
 

@@ -264,6 +264,9 @@ published; class-D smart speakers commonly run at 48 kHz internally. Therefore:
 | `hifid` RSS idle / during upload | (M2) | | |
 | PCM bit-perfect check 44.1 / 96 / 192 k | S16_LE / S24_3LE / S24_3LE at file rate | | `deploy/scripts/test-audio.sh` |
 | DSD64 / DSD128 delivery | native `DSD_U32_BE` (88 200 / 176 400 frames/s) | | `test-audio.sh --dsd` |
+| CPU while playing DSD256 native (real music file) | MPD threads ≈ 4–5 % of one core in total (player 1 %, output 1.5 %, io 0.7 %, rtio 1 %); whole system 97 % idle | | `top -H -p $(pidof mpd)` |
+| CPU while playing DSD128 native | ≈ 3 % of one core | | |
+| `mpd` RSS while playing DSD256 / idle | 78 MB / 62 MB | | |
 | dsd2pcm CPU %: DSD64, DSD128, DSD256 | not needed (native DSD) | | |
 | USB disk sequential write MB/s | (pending) | | `dd` / `f3write` |
 | Boot to MPD ready (s) | 25 s (3.3 s kernel + 21.5 s userspace) | | `systemd-analyze` |
