@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -75,8 +76,18 @@ func main() {
 				filepath.Join(stateDir, "downloads-queue.json"),
 				time.Duration(cfg.NetEase.DownloadPaceSeconds)*time.Second, log)
 			dlq.OnDownloaded = func(rel string) {
-				if err := pl.Update(filepath.Dir(rel)); err != nil {
-					log.Warn("mpd update after download", "path", rel, "err", err)
+				// Rescan the top-level "netease" directory rather than the
+				// track's own folder: MPD 0.23 fails to update a sub-path
+				// containing non-ASCII characters (it reports
+				// "Failed to access /srv/music/<artist>" for a CJK artist and
+				// indexes nothing), while an ASCII ancestor works. The scan is
+				// incremental, so this stays cheap.
+				root := rel
+				if i := strings.IndexByte(rel, '/'); i > 0 {
+					root = rel[:i]
+				}
+				if err := pl.Update(root); err != nil {
+					log.Warn("mpd update after download", "root", root, "path", rel, "err", err)
 				}
 			}
 			srv.SetQueue(dlq)
