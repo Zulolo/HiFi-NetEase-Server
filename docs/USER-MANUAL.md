@@ -126,6 +126,16 @@ volume makes noise; in that case keep the DAC at 100 % and use the amplifier's k
 
 - Path: `\\<board-ip>\music` (or `\\<hostname>\music`), user and password from
   `/etc/hifi/samba.txt` on the board (`sudo cat /etc/hifi/samba.txt`).
+- Windows must connect with that user, not with your Windows account. Either map a drive
+  ("This PC → Map network drive → Connect using different credentials", user `hifi`), or
+  once from a command prompt:
+
+  ```
+  net use \\<board-ip>\music /user:hifi <password> /persistent:yes
+  ```
+
+  If Explorer says "Windows can't find \\board\music" it usually tried your Windows account
+  first; the installer's `map to guest = Never` setting makes it ask for credentials instead.
 - Drop files or whole folders. Any folder structure is fine; `Artist/Album/NN - Title.ext` is
   recommended for tidy browsing.
 - MPD notices new files by itself (`auto_update`); large drops can take a minute to appear.
@@ -178,6 +188,7 @@ If a DAC misbehaves with the quirk (mis-clocked playback), remove
 | MPD not running after boot | `systemctl status mpd srv-music.mount`; the music disk must be mounted first (label `hifi`) |
 | Clicks or dropouts | `dmesg | grep -i xrun`; on Wi-Fi check `iw dev wlan0 get power_save` (must be off); keep the disk and DAC on different USB ports if the board has them |
 | Phone cannot find the server | use the IP instead of `.local`; make sure the phone is on the same network and the router does not isolate clients |
+| "Windows can't find \\board\music" | Port 445 is open but Windows connected as your own account and got no access. Connect as `hifi`: `net use \\board-ip\music /user:hifi <password>` (password in `/etc/hifi/samba.txt`); verify from the board with `testparm -s` that `[music]` exists |
 | Samba asks for a password again and again | `sudo smbpasswd -a hifi` to set a new one, or use `\\ip\music` with the user `hifi` |
 | DSD plays as PCM | `grep -o DSD_U32_BE /proc/asound/card*/stream0` empty → run `sudo ./dac-setup.sh --try-native-dsd`; DoP needs the DAC to accept the container rate (see §8) |
 | New files do not appear | `mpc update`; check permissions (`ls -l /srv/music/local`), files must be group `audio` readable |

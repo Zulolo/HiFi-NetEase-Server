@@ -65,6 +65,11 @@ cp "$DIR/../systemd/hifid-dac-hotplug@.service" /etc/systemd/system/ 2>/dev/null
 if [ $SAMBA -eq 1 ]; then
   id "$SAMBA_USER" >/dev/null 2>&1 || useradd -r -M -s /usr/sbin/nologin -G audio "$SAMBA_USER"
   usermod -aG audio "$SAMBA_USER"
+  # Debian's default "map to guest = Bad User" silently turns an unknown Windows account into a guest
+  # with no access, which Explorer reports as "Windows can't find \\board\music". "Never" makes
+  # Windows ask for the share credentials instead.
+  if grep -q '^\s*map to guest' /etc/samba/smb.conf; then sed -i 's/^\s*map to guest.*/   map to guest = Never/' /etc/samba/smb.conf
+  else sed -i '/^\[global\]/a\   map to guest = Never' /etc/samba/smb.conf; fi
   if ! grep -q '^\[music\]' /etc/samba/smb.conf; then cat >> /etc/samba/smb.conf <<EOF
 
 [music]
