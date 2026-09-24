@@ -1,68 +1,52 @@
-# ADR-0007 · Target board: Orange Pi Zero LTS first, Orange Pi RV as the fallback
+# ADR-0007 · Target board: Orange Pi Zero 3 (2 GB) verified as the first deployment; any Debian SBC supported
 
-- Status: accepted (revised 2026-09-13 with the decision to try the Zero LTS first)
-- Date: 2026-09-13
-- Requirements addressed: C-4, C-5, C-9, NFR-1, NFR-4
+- Status: accepted (revised 2026-09-24 after bench verification on the actual board)
+- Date: 2026-09-13, revised 2026-09-24
+- Requirements addressed: C-4, C-5, C-9, NFR-1, NFR-2, NFR-3, NFR-4
 
 ## Context
 
-The reference targets are an Orange Pi Zero LTS (Allwinner H3, 4× Cortex-A7, 512 MB, one USB
-Type-A plus header ports, XR819 Wi-Fi: 2.4 GHz only, out-of-tree driver, widely reported
-unstable) and an Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB, 4× USB 3.0, Broadcom AP6256
-Wi-Fi). **Wi-Fi is the only network link** at the speaker's location; separate 2.4 GHz and
-5 GHz networks are available.
+Earlier revisions of this record weighed an Orange Pi Zero LTS (H3, 512 MB) against an Orange
+Pi RV (JH7110). The board actually put on the bench identifies itself as **Orange Pi Zero 3,
+Allwinner H618, 2 GB RAM**, running the vendor Debian 12 image with kernel 6.1.31 and
+Wi-Fi through a Unisoc UWE5622 module. That removes the two concerns that drove the previous
+revision (512 MB and the XR819 Wi-Fi). The design goal for the public repository is that the
+same scripts work on **any** Debian-based SBC; the Zero 3 is one tested configuration.
 
-The usage profile changes the weight of the Wi-Fi risk:
+Bench results (2026-09-24, deploy/scripts on the Zero 3):
 
-- Music is played mostly from **local files** (NetEase downloads and Samba uploads), so the
-  audio path does not depend on Wi-Fi during playback.
-- The board is **always on**, so NetEase downloads can run in the background, where slow or
-  briefly dropped Wi-Fi only delays a job.
-- A spare low-power board is the preferred host; trying the Zero LTS costs nothing, and
-  another board can replace it if Wi-Fi turns out to be a nuisance.
-
-The CPU is not a constraint: the DAC does the D/A conversion, native DSD is pass-through,
-and FLAC decoding costs the H3 10–20 % of one core. RAM (512 MB) is tight but sufficient for
-MPD, `hifid`, Samba and Avahi (docs/05 §6).
+| Check | Result |
+|---|---|
+| Packages | Debian 12 + backports: mpd 0.24.2, ffmpeg 5.1, samba 4.22, avahi, alsa-utils |
+| Music disk | 512 GB microSD in a USB reader, ext4 label `hifi`, mounted at `/srv/hifi` with bind mounts |
+| DAC | Comtrue-bridge ES9039 dongle (`2fc6:f802`): PCM 44.1–768 kHz, 16/24/32 bit, hardware `PCM` mixer |
+| Native DSD | Not offered by kernel 6.1 out of the box (`SPECIAL`); with `snd-usb-audio quirk_flags=0x8000` the card advertises `DSD_U32_BE`; persisted in `/etc/modprobe.d/hifi-dsd.conf` |
+| Bit-perfect PCM | 44.1 k → `S16_LE 44100`, 96 k → `S24_3LE 96000`, 192 k → `S24_3LE 192000` in `hw_params` |
+| Native DSD playback | DSD64 → `DSD_U32_BE 88200`, DSD128 → `DSD_U32_BE 176400` (no DoP, no conversion) |
+| Persistence | Card name `ES9039`, quirk, mounts, mpd/smbd/avahi/watchdog all present after reboot |
+| Resources | mpd 58 MB RSS, smbd 22 MB, 1.49 GB free of 1.99 GB; boot to ready 25 s; SoC 53 °C idle with the dongle |
 
 ## Options considered
 
 | Option | Pros | Cons |
 |---|---|---|
-| **Orange Pi Zero LTS first, onboard XR819 on the 2.4 GHz network** | ≈ 1–1.5 W idle for an always-on box; a spare board; local playback needs no Wi-Fi; downloads tolerate slow links | XR819 throughput ≈ 10–25 Mbps and disconnects; phone control and Samba copies suffer when it drops; 512 MB; armhf; needs a hub or the 13-pin expansion board for disk + DAC; micro-USB 2 A input |
-| Zero LTS + USB Wi-Fi adapter with a mainline driver (`mt76`) | Removes the XR819 problem, keeps the small board, 5 GHz | ≈ 15–20 USD and one more USB device on the single USB 2.0 root |
-| Orange Pi RV | Mainline Broadcom Wi-Fi, 2–8 GB, 4× USB 3.0, 4 A supply, official Debian riscv64 | ≈ 3–4 W idle; vendor image / DTB path to verify; VL805 firmware unverified |
-| Raspberry Pi 5 (reference) | Most trouble-free USB audio host | Over-specified for the task; ≈ 2.5–3 W idle |
+| **Orange Pi Zero 3 (2 GB) as the first deployment** | Verified above; ≈ 1–2 W; owner has it; plenty of RAM for MPD + hifid + Samba | USB 2.0 only, one Type-A port (disk and DAC on separate root ports here: fine); Wi-Fi driver is out-of-tree (watchdog enabled) |
+| Orange Pi RV (JH7110) | More USB ports, mainline Broadcom Wi-Fi | Not needed now; stays a supported riscv64 target |
+| Raspberry Pi 3/4/5 | Best-documented USB audio hosts | Not owned as the intended host; supported by the same scripts |
 
 ## Decision
 
-Deploy first on the **Orange Pi Zero LTS** using its onboard Wi-Fi on the 2.4 GHz network,
-with these mitigations built into the design:
-
-1. A Wi-Fi watchdog (`deploy/systemd/wifi-watchdog.timer`) that restarts the interface when
-   the gateway stops answering; power save off; fixed channel on the 2.4 GHz access point.
-2. Every network-dependent function is retry-tolerant: the download scheduler resumes
-   interrupted files, the stream proxy re-resolves URLs, the PWA reconnects its WebSocket.
-3. Local playback is the default mode: NetEase content is synced to disk (docs/08 §7.1)
-   rather than streamed, so Wi-Fi never sits in the audio path once a track is downloaded.
-4. Resource limits for 512 MB: MPD buffer 8 MB, zram swap, no myMPD/upmpdcli.
-
-Acceptance thresholds during M0 (same as before, now pass/fail for staying on this board):
-24 h without a Wi-Fi outage longer than 60 s and ≤ 2 % packet loss; 24 h of 24/192 and
-DSD128/256 local playback without xruns while a Samba copy runs; native DSD or DoP256 for
-the ES9039Q2M dongle; ≥ 100 MB RAM headroom.
-
-If the Zero LTS fails the Wi-Fi threshold, the first escalation is a `mt76` USB Wi-Fi
-adapter on the same board; the second is moving to the **Orange Pi RV**, which is why all
-artifacts are built for armhf, riscv64 and arm64 alike.
+Deploy on the Orange Pi Zero 3. Keep every script and unit architecture-neutral (arm64,
+armhf, riscv64) and free of board-specific assumptions: disk by label, DACs by USB IDs,
+Wi-Fi watchdog only when the default route is wireless, DSD quirk only when a DAC advertises
+raw DSD that the kernel did not enable. The M0 acceptance thresholds (24 h stability, no
+xruns, native DSD or DoP, RAM headroom) are met for the DAC and RAM criteria; the 24 h Wi-Fi
+and playback soak runs in the background during M1.
 
 ## Consequences
 
-- Build targets: armhf first (`GOARCH=arm GOARM=7`), riscv64 and arm64 kept; install script
-  and units architecture-neutral.
-- Zero LTS bill of materials: 13-pin expansion board or a small USB hub (flash drive + DAC),
-  heatsink on the H3, good 5 V/2 A micro-USB supply and cable.
-- Design emphasis shifts to offline-first: the NetEase sync job and a robust Samba import path
-  matter more than streaming polish.
-- The residual Wi-Fi risk (phone control latency, Samba speed of ≈ 1–3 MB/s on this chip's
-  2.4 GHz link) is accepted for the first deployment.
+- docs/05 and docs/12 keep the earlier board comparison as general guidance for readers with
+  other boards; the "reported 512 MB" assumption is withdrawn.
+- The vendor kernel 6.1 lacks the Comtrue native-DSD entry that mainline gained in 6.14; the
+  installer's quirk handling covers this class of case on any older kernel.
+- `hifid` (M2) can rely on 2 GB: the 16 MB MPD buffer and Samba stay enabled.

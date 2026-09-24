@@ -6,9 +6,14 @@ Each milestone ends in something the owner can use on the real speaker. Effort i
 solo-developer estimate; hardware verification steps are explicit because DAC behaviour on
 Linux can only be confirmed on the actual dongles.
 
-## M0 · Bench verification (no custom code) · ~2 evenings
+## M0 · Bench verification · done 2026-09-24 on an Orange Pi Zero 3 (2 GB)
 
-Goal: prove the audio path on the chosen board before writing anything.
+Result: `deploy/scripts/install.sh` brings a fresh Debian 12 board to a working bit-perfect
+MPD server with Samba and Avahi in one run; the Comtrue/ES9039 dongle plays PCM to 768 kHz
+and native DSD64/128 (after the installer's kernel quirk); everything survives a reboot
+(details in ADR-0007 and docs/05 §11). Still running: the 24 h Wi-Fi and playback soak.
+
+Original plan, kept for readers repeating it on other hardware:
 
 0. Record the ES9039Q2M dongle's `lsusb` ID (docs/12 Q13). Zero LTS bill of materials:
    13-pin expansion board or small USB hub, heatsink, good 5 V/2 A micro-USB supply.

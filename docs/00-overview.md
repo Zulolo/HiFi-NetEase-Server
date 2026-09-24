@@ -18,6 +18,7 @@ input, controlled from a phone. Read in order; each document cites requirement I
 | 10 | [Deployment and operations](10-deployment-and-operations.md) | OS image, install steps, systemd, config files, security, backup |
 | 11 | [Roadmap and milestones](11-roadmap-and-milestones.md) | M0 bench verification through M6 extensions |
 | 12 | [Risks and open questions](12-risks-and-open-questions.md) | Risk register, questions for the owner, assumptions |
+| Manual | [User manual](USER-MANUAL.md) | How to install and use what exists today (MPD layer, DAC setup, phone control, Samba import) on any Debian SBC |
 | ADR | [Architecture decision records](adr/) | 0001 MPD engine · 0002 Go service + NetEase library · 0003 PWA first · 0004 tus uploads · 0005 DSD strategy · 0006 output selection · 0007 target board |
 
 Diagrams are Mermaid blocks inside the documents (03 and 11); GitHub and VS Code render them.
@@ -27,5 +28,5 @@ Diagrams are Mermaid blocks inside the documents (03 and 11); GitHub and VS Code
 1. **MPD** plays everything, bit-perfect, with native DSD → DoP → PCM fallback and switchable USB outputs.
 2. **`hifid`** (one Go binary) logs into NetEase with the owner's account, proxies streams into MPD, exports playlists, downloads with tags, accepts resumable uploads, probes DACs and generates MPD's config.
 3. **PWA** on the phone for everything; M.A.L.P. works from day 1; a native app is optional.
-4. **Orange Pi Zero LTS** (H3, 512 MB) hosts the first deployment: playback is mostly from local files and the always-on box downloads in the background, so its weak XR819 Wi-Fi is mitigated by an offline-first design and a watchdog; the Orange Pi RV (riscv64) is the fallback (ADR-0007).
+4. **Orange Pi Zero 3** (2 GB) is the verified first deployment; the scripts stay generic for any Debian SBC, and the Orange Pi RV (riscv64) is the secondary target (ADR-0007).
 5. **M0** proves each dongle's DSD mode on the bench before any feature code is written.

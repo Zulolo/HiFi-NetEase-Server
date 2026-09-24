@@ -137,8 +137,8 @@ unit, so expect similar or worse figures there. Therefore:
 
 | Dongle (VID:PID) | Chip | Bridge | ALSA id (udev) | PCM rates | Native DSD (stream0) | DoP tested to | HW volume OK with DoP? | Kernel/quirk used |
 |---|---|---|---|---|---|---|---|---|
-| e.g. Moondrop Dawn Pro (2fc6:f06a) | 2× CS43131 | Comtrue | DawnPro | | | | | |
-| ES9039Q2M dongle #1 ( : ) | ES9039Q2M | ? | | | | | | |
+| "XR768-9039" dongle (2fc6:f802), verified 2026-09-24 | ES9039 | Comtrue | ES9039 | 44.1–768 k, 16/24/32 bit, async | `SPECIAL` on kernel 6.1.31; `DSD_U32_BE` after `quirk_flags=0x8000`; DSD64 and DSD128 played natively | not needed | n/a (native); `PCM` mixer present | Orange Pi vendor 6.1.31 + installer quirk |
+| e.g. Moondrop Dawn Pro (2fc6:f06a) | 2× CS43131 | Comtrue | DawnPro | | expected like the row above | | | |
 | CS43131 dongle #2 ( : ) | CS43131 | ? | | | | | | |
 
 Expected outcomes from the datasheets:

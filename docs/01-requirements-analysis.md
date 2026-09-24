@@ -13,7 +13,7 @@ evaluation) refer back to the requirement IDs defined here (FR-x, NFR-x, C-x).
 |------|-------|
 | Speaker | Marshall Acton IV. Inputs: 3.5 mm AUX (analog), RCA (analog), Bluetooth 5.3 (SBC/AAC/LDAC/LC3). No USB, no S/PDIF, no HDMI, no Wi-Fi. |
 | Connection to speaker | 3.5 mm AUX cable from a USB DAC dongle. |
-| Server board | Reference targets: Orange Pi Zero LTS (Allwinner H3, armhf, 512 MB, XR819 Wi-Fi) first; Orange Pi RV (StarFive JH7110, riscv64, 2–8 GB) as fallback. Both run Debian server images. A low-power board is preferred over a faster one. |
+| Server board | Verified: Orange Pi Zero 3 (Allwinner H618, arm64, 2 GB, Debian 12 vendor image). Secondary target: Orange Pi RV (StarFive JH7110, riscv64). The scripts must stay generic for any Debian-based SBC. |
 | Usage profile | Playback mostly from local files (NetEase downloads and Samba uploads); the box is always on, so downloads run in the background. |
 | OS storage | 64 GB microSD (TF) card. |
 | Music storage | 512 GB USB flash drive. |
@@ -139,10 +139,10 @@ own analog jack) may be attached at once; the user picks the active one from the
 | C-1 | Official NetEase client is closed source and desktop-only. | Use an open-source API implementation; keep the NetEase adapter isolated behind an interface so it can be swapped when the API changes. |
 | C-2 | NetEase stream URLs expire (minutes) and depend on account entitlement (VIP for lossless/Hi-Res on many tracks). | The playback engine must never hold raw CDN URLs in its queue; resolve lazily through a local proxy. |
 | C-3 | Unofficial API use is against NetEase ToS in spirit; endpoints change without notice. | Personal, single-account, LAN-only use; no redistribution; expect maintenance. Documented in 12-risks. |
-| C-4 | Target architectures: riscv64 (RV) first, armhf (Zero LTS) and arm64 kept. | Prefer components packaged in Debian for all three, and Go for custom code (trivial cross-compilation, no runtime). Avoid Electron/Node/Chromium on the server. |
-| C-5 | The Zero LTS has 512 MB RAM, a Cortex-A7 CPU and USB 2.0 only. | RAM budget ≤ 300 MB for all our services including Samba; no optional extras on that board; no software DSD conversion there; USB 2.0 is sufficient for audio (see doc 05). |
-| C-9 | Wi-Fi is the only network link; on the Zero LTS it is the 2.4 GHz-only XR819 (separate 2.4 GHz and 5 GHz networks exist). | Offline-first design: NetEase content is synced to disk in the background; every network job is retry-tolerant; a watchdog keeps the link up; imports over this chip run at ≈ 1–3 MB/s. |
-| C-10 | Music storage is a USB flash drive. | Sustained writes 10–30 MB/s; keep database/index writes small; verify genuine capacity before use. |
+| C-4 | Target architectures: arm64 (Zero 3) first, riscv64 (RV) and armhf kept. | Prefer components packaged in Debian for all three, and Go for custom code (trivial cross-compilation, no runtime). Avoid Electron/Node/Chromium on the server. |
+| C-5 | Readers may use boards with as little as 512 MB and USB 2.0 only. | RAM budget ≤ 300 MB for all our services including Samba; the config generator scales buffers with RAM; USB 2.0 is sufficient for audio (see doc 05). |
+| C-9 | Wi-Fi is the only network link (Zero 3: Unisoc UWE5622, out-of-tree driver; separate 2.4 GHz and 5 GHz networks exist). | Offline-first design: NetEase content is synced to disk in the background; every network job is retry-tolerant; a watchdog keeps the link up. |
+| C-10 | Music storage is a 512 GB microSD card in a USB reader (flash-class media). | Sustained writes 10–40 MB/s; keep database/index writes small; verify genuine capacity before use. |
 | C-6 | Acton IV inputs are analog; it digitizes AUX internally for its DSP. | The audible ceiling is set by the speaker's ADC/DSP. The chain is still built bit-perfect up to the DAC, but ultra-high rates (≥ 384 kHz, DSD512) bring no audible gain on this speaker. |
 | C-7 | OS on a microSD card. | Keep write-heavy data (library DB, caches, downloads, logs) on the USB disk; keep the card mostly read-only in spirit. |
 | C-8 | Headless, no display attached. | All administration via web UI/SSH; QR login rendered in the web UI. |

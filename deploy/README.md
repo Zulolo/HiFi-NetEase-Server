@@ -1,15 +1,19 @@
-# deploy/ · Debian deployment artifacts
+# deploy/ · Debian deployment
 
-Templates and unit files used by the install procedure in docs/10. Everything
-here is meant to be copied to the board as-is or rendered by `hifid` from
-config.
+Everything needed to turn a Debian-based SBC into the playback layer of the server. Copy the
+folder to the board and run `scripts/install.sh` (see [docs/USER-MANUAL.md](../docs/USER-MANUAL.md)).
 
 ```
 deploy/
-├── mpd/        mpd.conf template (bit-perfect ALSA outputs, DSD options, per-DAC blocks)
-├── udev/       rules giving USB DACs stable ALSA card names and triggering hot-plug events
-├── systemd/    hifid.service, mpd.service drop-in (RT priority, ordering after the USB disk mount),
-│               mount unit for the 512 GB disk
-├── nginx/      optional reverse proxy / TLS for PWA install on LAN (see docs/06)
-└── scripts/    install.sh, probe-dac.sh (capability dump), bench-dsd.sh (CPU cost measurement)
+├── scripts/    install.sh and the helpers it calls (disk, DAC detection, MPD config, audio test, watchdog)
+├── mpd/        mpd.conf.template (rendered by gen-mpd-conf.sh) and mpd.conf.example (as rendered on the verified board)
+├── udev/       90-hifi-dac.rules example; the installer generates the real one from the attached DACs
+├── systemd/    mpd.service drop-in (RT limits, mount ordering), wifi-watchdog timer/service, DAC hot-plug hook,
+│               Avahi service file, hifid.service and mount units for reference (setup-disk.sh writes the mounts itself)
+└── nginx/      optional reverse proxy notes (only for TLS in front of the future hifid)
 ```
+
+Nothing here is specific to one board or one DAC: disks are addressed by label, DACs by their
+USB vendor/product ids, the Wi-Fi watchdog is installed only when the default route is
+wireless, and the DSD kernel quirk only when a DAC advertises raw DSD that the running kernel
+did not enable.

@@ -5,9 +5,12 @@ and similar) that plays a 网易云音乐 (NetEase Cloud Music) library and loca
 DSD, bit-perfect through USB DAC dongles into any amplifier or active speaker with an analog
 input, controlled from a phone on the LAN, with music imported from a PC over the LAN.
 
-**Status: design phase.** This repository currently contains the requirements analysis,
-open-source survey, architecture, calculations, decision records and deployment templates.
-No application code yet; see [docs/11](docs/11-roadmap-and-milestones.md) for the plan.
+**Status: playback layer working (milestone M0 done).** `deploy/scripts/install.sh` turns a
+fresh Debian board into a bit-perfect MPD server with DAC auto-detection (including native
+DSD where the kernel allows it), a Samba share and phone control through any MPD client.
+Start with the [user manual](docs/USER-MANUAL.md). The NetEase service and the phone web app
+are the next milestones ([docs/11](docs/11-roadmap-and-milestones.md)); the design documents
+are in [docs/](docs/00-overview.md).
 
 ## What it will do
 
@@ -36,19 +39,30 @@ The design is architecture-neutral (armhf, arm64, riscv64). What matters:
 
 | Part | Recommendation |
 |---|---|
-| Board | Any Debian-capable SBC with ≥ 512 MB RAM and at least one USB 2.0 host port. Tested targets in order of priority: Orange Pi Zero LTS (Allwinner H3, 512 MB), Orange Pi RV (StarFive JH7110, riscv64); any Raspberry Pi 3 or newer works. CPU is not the constraint; Wi-Fi driver quality and RAM are (docs/05). |
+| Board | Any Debian-capable SBC with ≥ 512 MB RAM and at least one USB 2.0 host port. Verified: Orange Pi Zero 3 (Allwinner H618, 2 GB, Debian 12). Also targeted: Orange Pi RV (riscv64); any Raspberry Pi 3 or newer works the same way. CPU is not the constraint; Wi-Fi driver quality and RAM are (docs/05). |
 | Network | Ethernet if available. On Wi-Fi, prefer boards with a mainline Wi-Fi driver (Broadcom `brcmfmac`, MediaTek `mt76`); the design is offline-first so weak Wi-Fi only slows imports and background downloads (ADR-0007). |
 | Music storage | USB flash drive or SSD (ext4). Check real capacity with `f3probe` before trusting a large cheap stick. |
-| DAC | Any USB Audio Class 2 dongle. ES9039Q2M-class dongles do native DSD up to DSD512; CS43131-class dongles do DoP up to DSD128. Whether Linux offers native DSD depends on the USB bridge chip (docs/04 §4). |
+| DAC | Any USB Audio Class 2 dongle. Verified: a Comtrue-bridge ES9039 dongle (`2fc6:f802`), PCM to 768 kHz and native DSD after the installer's kernel quirk. ES9039Q2M-class dongles do native DSD up to DSD512; CS43131-class dongles do DoP up to DSD128. Whether Linux offers native DSD depends on the USB bridge chip (docs/04 §4). |
 | Speaker / amp | Anything with an analog line input (3.5 mm AUX or RCA). Note that smart speakers digitize the AUX input internally, which caps the audible benefit of very high sample rates (docs/05 §10). |
 | NetEase account | Quality ladder follows the account tier (standard → exhigh → lossless/hires with VIP → jymaster with SVIP) and is configurable. |
 
+## Quick start
+
+```
+scp -r deploy user@board:~/hifi/
+ssh user@board
+cd ~/hifi/deploy/scripts && chmod +x *.sh
+sudo ./install.sh --disk /dev/sdb1 --format     # or --disk-label hifi / --no-disk
+sudo ./test-audio.sh                            # proves the bit-perfect path
+```
+
+Then add the server (port 6600) in M.A.L.P. on the phone and drop music onto `\\board\music`.
+Full instructions and troubleshooting: [docs/USER-MANUAL.md](docs/USER-MANUAL.md).
+
 ## Next step
 
-Milestone M0 (bench verification, no custom code): flash Debian/Armbian on the board, install
-`mpd` and `samba`, run `deploy/scripts/probe-dac.sh` on each dongle, fill the DAC matrix in
-[docs/04 §7](docs/04-audio-pipeline-dsd-dac.md), and check the Wi-Fi and USB-audio
-thresholds of [ADR-0007](docs/adr/0007-primary-target-board.md).
+Milestone M1/M2: the `hifid` Go service (NetEase login, stream proxy, offline sync, REST API)
+and the phone PWA, per [docs/11](docs/11-roadmap-and-milestones.md).
 
 ## Licence
 
