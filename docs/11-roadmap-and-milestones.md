@@ -15,11 +15,11 @@ and native DSD64/128 (after the installer's kernel quirk); everything survives a
 
 Original plan, kept for readers repeating it on other hardware:
 
-0. Record the ES9039Q2M dongle's `lsusb` ID (docs/12 Q13). Zero LTS bill of materials:
-   13-pin expansion board or small USB hub, heatsink, good 5 V/2 A micro-USB supply.
-1. Flash Armbian (armhf, minimal) on the Zero LTS, check the flash drive with `f3probe`,
-   attach it and the ES9039Q2M dongle, join the 2.4 GHz network with power save off and the
-   Wi-Fi watchdog timer enabled. (RV only if the Zero LTS fails the thresholds below.)
+0. Record each dongle's `lsusb` ID (docs/12 Q13) and make sure the board has a port for the
+   disk and one for the DAC (hub or header ports if needed), a heatsink and its rated supply.
+1. Flash the distribution image, check the music disk with `f3probe`, attach it and the
+   DAC, join Wi-Fi with power save off. Run `deploy/scripts/install.sh` (it enables the
+   watchdog timer when the default route is wireless).
 2. `apt install mpd mpc alsa-utils ffmpeg samba`; run `deploy/scripts/probe-dac.sh` on every dongle:
    record VID:PID, ALSA card name, `/proc/asound/cardX/stream0` formats, native DSD flag,
    supported rates. Fill the table in docs/04 §7.
