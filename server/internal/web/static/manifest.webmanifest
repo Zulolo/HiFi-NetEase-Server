@@ -1,0 +1,9 @@
+{
+  "name": "HiFi Server",
+  "short_name": "HiFi",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#101214",
+  "theme_color": "#101214",
+  "icons": []
+}
