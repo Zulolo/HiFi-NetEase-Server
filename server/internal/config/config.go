@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	ServerName string `yaml:"server_name"`
-	Listen     string `yaml:"listen"`
-	Auth       Auth   `yaml:"auth"`
-	Paths      Paths  `yaml:"paths"`
-	MPD        MPD    `yaml:"mpd"`
+	ServerName string  `yaml:"server_name"`
+	Listen     string  `yaml:"listen"`
+	Auth       Auth    `yaml:"auth"`
+	Paths      Paths   `yaml:"paths"`
+	MPD        MPD     `yaml:"mpd"`
+	NetEase    NetEase `yaml:"netease"`
 }
 
 // Auth mode: none (trusted LAN) | admin (token for mutating admin calls) | all.
@@ -28,6 +29,14 @@ type Paths struct {
 	Music    string `yaml:"music"`
 	Data     string `yaml:"data"`
 	Incoming string `yaml:"incoming"`
+}
+
+type NetEase struct {
+	Enabled bool `yaml:"enabled"`
+	// LevelPreference is the quality ladder, best first (docs/08 §4).
+	LevelPreference []string `yaml:"level_preference"`
+	// StreamMode must stay "pipe": the CDN mislabels FLAC (ADR-0008).
+	StreamMode string `yaml:"stream_mode"`
 }
 
 type MPD struct {
@@ -47,6 +56,11 @@ func Default() *Config {
 			Incoming: "/srv/data/incoming",
 		},
 		MPD: MPD{Socket: "/run/mpd/socket", Host: "127.0.0.1", Port: 6600},
+		NetEase: NetEase{
+			Enabled:         true,
+			LevelPreference: []string{"jymaster", "hires", "lossless", "exhigh", "higher", "standard"},
+			StreamMode:      "pipe",
+		},
 	}
 }
 

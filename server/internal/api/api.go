@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
 )
 
@@ -20,6 +21,7 @@ type Server struct {
 	log     *slog.Logger
 	started time.Time
 	version string
+	ncm     *netease.Client
 
 	hub *hub
 }
@@ -85,11 +87,20 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("PUT /api/v1/player/options", g(s.options))
 
 	m.HandleFunc("GET /api/v1/queue", g(s.getQueue))
+	m.HandleFunc("POST /api/v1/queue", g(s.addQueue))
 	m.HandleFunc("DELETE /api/v1/queue", g(s.simple(s.pl.Clear)))
 	m.HandleFunc("DELETE /api/v1/queue/{qid}", g(s.delQueueItem))
 
 	m.HandleFunc("GET /api/v1/outputs", g(s.getOutputs))
 	m.HandleFunc("PUT /api/v1/outputs/{id}/active", g(s.setActiveOutput))
+
+	m.HandleFunc("GET /api/v1/netease/status", g(s.ncmStatus))
+	m.HandleFunc("GET /api/v1/netease/playlists", g(s.ncmPlaylists))
+	m.HandleFunc("GET /api/v1/netease/playlists/{id}/tracks", g(s.ncmPlaylistTracks))
+
+	// MPD fetches this; it is loopback-only and carries no token (docs/08 §5).
+	m.HandleFunc("GET /stream/ncm/{id}", s.ncmStream)
+	m.HandleFunc("HEAD /stream/ncm/{id}", s.ncmStream)
 
 	m.HandleFunc("GET /api/v1/ws", s.hub.serveWS)
 	m.Handle("/", ui)

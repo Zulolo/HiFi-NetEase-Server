@@ -65,7 +65,24 @@ Goal: listen to the NetEase library on the Acton IV from the phone, using existi
 
 Exit criteria: phone PWA controls MPD; NetEase playable through go-musicfox.
 
-## M2 · Native NetEase integration in `hifid` · ~2–3 weeks
+## M2 · Native NetEase integration in `hifid` · core done 2026-09-24
+
+Done so far (v0.2.0-m2, verified on the board): the NetEase adapter over the ADR-0002 library
+with the session on disk under `/srv/data/hifid/netease`; the quality ladder walking
+`jymaster → … → standard` and reading back the **granted** level; the pipe-mode stream proxy of
+ADR-0008; `POST /queue` accepting `ncm:<id>` refs, which enqueues the loopback proxy URL and
+applies `addtagid` so plain MPD clients show the right title; catalogue endpoints for playlists
+and playlist tracks; and a PWA browse screen (playlists → tracks → tap to play).
+
+Measured end to end: queueing `ncm:22605222` played the `jymaster` master as
+`S24_3LE @ 192000 Hz, 2 ch` bit-perfect to the ES9039 dongle, with `hifid` costing 1.8 % CPU and
+18 MB RSS while relaying the stream — so keeping the proxy in the audio path (ADR-0008) is
+comfortably affordable. `mpc playlist` showed "Radiohead - Creep", confirming `addtagid`.
+
+Remaining for M2: QR login inside `hifid` (the library exposes `QrcodeCreateKey` /
+`QrcodeGenerate` / `QrcodeCheck`; the session is currently seeded from an `ncmctl` login),
+search and daily recommendations, cloud disk, playlist export to `playlists/NetEase/*.m3u`,
+the download pipeline with tagging, and the offline sync scheduler of docs/08 §7.1.
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.
 2. Stream proxy `/stream/ncm/{id}` with redirect mode, URL cache, `addtagid` metadata.

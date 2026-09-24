@@ -382,3 +382,29 @@ func (p *Player) Watch(onEvent func(subsystem string)) (stop func(), err error) 
 	}()
 	return func() { close(done); w.Close() }, nil
 }
+
+// AddTagged appends uri to the queue and applies MPD tags to the new entry.
+// Remote streams carry no usable tags of their own, so hifid supplies them with
+// addtagid — the supported MPD mechanism for tagging remote songs (docs/08 §5).
+func (p *Player) AddTagged(uri string, tags map[string]string) (int, error) {
+	var qid int
+	err := p.with(func(c *mpd.Client) error {
+		id, err := c.AddID(uri, -1)
+		if err != nil {
+			return err
+		}
+		qid = id
+		for _, tag := range []string{"Title", "Artist", "Album", "AlbumArtist", "Track", "Date"} {
+			v, ok := tags[tag]
+			if !ok || v == "" {
+				continue
+			}
+			if err := c.Command("addtagid %d %s %s", id, mpd.Quoted(tag), v).OK(); err != nil {
+				// a rejected tag must not lose the queued song
+				continue
+			}
+		}
+		return nil
+	})
+	return qid, err
+}

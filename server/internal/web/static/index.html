@@ -29,6 +29,16 @@
           font-variant-numeric:tabular-nums; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#d9534f; margin-right:6px; }
   .dot.ok { background:#54c06e; }
+  .list { list-style:none; margin:0; padding:0; max-height:46vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .list li { display:flex; gap:10px; align-items:center; padding:10px 6px; border-bottom:1px solid #222a31; cursor:pointer; }
+  .list li:last-child { border-bottom:0; }
+  .list li:active { background:#222a31; }
+  .list img { width:40px; height:40px; border-radius:6px; object-fit:cover; flex:0 0 auto; background:#242a30; }
+  .list .txt { min-width:0; flex:1 1 auto; }
+  .list .n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .list .s { color:var(--mut); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .hdr button { flex:0 0 auto; min-width:0; padding:6px 12px; font-size:13px; }
 </style>
 </head>
 <body>
@@ -59,6 +69,14 @@
   <select id="outputs"></select>
 </div>
 
+<div class="card">
+  <div class="hdr">
+    <div class="sub" id="browse-title">NetEase</div>
+    <button id="browse-back" hidden>← Back</button>
+  </div>
+  <div class="sub" id="browse-status">loading…</div>
+  <ul class="list" id="browse-list"></ul>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

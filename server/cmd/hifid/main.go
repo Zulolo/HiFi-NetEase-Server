@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/api"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/web"
 )
@@ -50,6 +52,25 @@ func main() {
 	log.Info("mpd target", "network", network, "addr", addr)
 
 	srv := api.New(cfg, pl, log, version)
+
+	// NetEase adapter (ADR-0002). A failure here must not stop local playback
+	// (NFR-6): hifid logs it and serves everything else.
+	if cfg.NetEase.Enabled {
+		ncm, err := netease.New(netease.Config{
+			StateDir: filepath.Join(cfg.Paths.Data, "netease"),
+			Levels:   cfg.NetEase.LevelPreference,
+		})
+		if err != nil {
+			log.Error("netease adapter unavailable", "err", err)
+		} else {
+			srv.SetNetEase(ncm)
+			if p, err := ncm.Profile(context.Background()); err != nil {
+				log.Warn("netease session not usable yet", "err", err)
+			} else {
+				log.Info("netease session", "nickname", p.Nickname, "vip_type", p.VipType)
+			}
+		}
+	}
 
 	// Fan MPD idle events out to WebSocket clients. A missing MPD at start-up
 	// is not fatal: hifid must serve status so the UI can show the problem.

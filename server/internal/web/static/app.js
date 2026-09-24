@@ -116,3 +116,73 @@ refresh();
 loadOutputs();
 connect();
 setInterval(refresh, 1000); // keeps the elapsed counter moving between events
+
+// ---- NetEase browsing (M2) -------------------------------------------------
+// Two levels: playlists, then the tracks of one playlist. Tapping a track
+// replaces the queue and plays it; the server resolves the quality ladder and
+// enqueues its own /stream/ncm/<id> proxy URL, never a raw CDN URL.
+const bList = $("browse-list");
+const bTitle = $("browse-title");
+const bStatus = $("browse-status");
+const bBack = $("browse-back");
+
+const img = (src) =>
+  src ? `<img src="${src.replace(/^http:/, "https:")}?param=80y80" alt="" loading="lazy">` : `<img alt="">`;
+
+function setStatus(text) {
+  bStatus.textContent = text || "";
+  bStatus.hidden = !text;
+}
+
+async function showPlaylists() {
+  bTitle.textContent = "NetEase";
+  bBack.hidden = true;
+  setStatus("loading playlists…");
+  bList.innerHTML = "";
+  const r = await call("/netease/playlists?limit=60", "GET");
+  if (!r || !r.items) {
+    setStatus("NetEase unavailable — check the session on the server.");
+    return;
+  }
+  setStatus(`${r.items.length} playlists`);
+  r.items.forEach((p) => {
+    const li = document.createElement("li");
+    li.innerHTML = `${img(p.cover)}<div class="txt"><div class="n">${p.liked ? "★ " : ""}${p.name}</div><div class="s">${p.track_count} tracks</div></div>`;
+    li.onclick = () => showTracks(p.id, p.name);
+    bList.appendChild(li);
+  });
+}
+
+async function showTracks(id, name) {
+  bTitle.textContent = name;
+  bBack.hidden = false;
+  setStatus("loading tracks…");
+  bList.innerHTML = "";
+  const r = await call(`/netease/playlists/${id}/tracks?limit=100`, "GET");
+  if (!r || !r.items) {
+    setStatus("could not load tracks");
+    return;
+  }
+  setStatus(`${r.items.length} of ${r.total} tracks`);
+  r.items.forEach((t) => {
+    const li = document.createElement("li");
+    li.innerHTML = `${img(t.cover)}<div class="txt"><div class="n">${t.title}</div><div class="s">${t.artist}</div></div>`;
+    li.onclick = async () => {
+      setStatus(`loading "${t.title}"…`);
+      const st = await call("/queue", "POST", { items: [{ ref: t.ref }], mode: "replace", play: true });
+      if (st) { render(st); setStatus(`${r.items.length} of ${r.total} tracks`); }
+      else setStatus(`could not play "${t.title}"`);
+    };
+    bList.appendChild(li);
+  });
+}
+
+bBack.onclick = () => showPlaylists();
+
+fetch(API + "/netease/status")
+  .then((r) => r.json())
+  .then((s) => {
+    if (s && s.logged_in) showPlaylists();
+    else setStatus("NetEase not logged in on the server.");
+  })
+  .catch(() => setStatus("NetEase unavailable."));
