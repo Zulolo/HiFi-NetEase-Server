@@ -17,7 +17,7 @@ Debian-based SBC and any USB Audio Class 2 DAC should behave the same way.
 | Music storage | USB flash drive or SSD, or a second microSD in a USB reader; will be formatted ext4 | The OS card is not used for music |
 | DAC | Any USB Audio Class 2 dongle or DAC | Native DSD depends on the USB bridge chip; DoP works on every DoP-capable DAC; PCM always works |
 | Amplifier / speaker | Any analog line input (3.5 mm or RCA) | The DAC's headphone output drives line inputs fine at 100 % volume |
-| Phone | Android or iOS with an MPD client | M.A.L.P. (Android, free, F-Droid/Play), MPDroid alternatives, or a desktop client like Cantata |
+| Phone | Any phone with a browser (myMPD web client on the board), or an MPD client app | M.A.L.P. for Android via F-Droid (the Play Store hides it on Android 14+), or a desktop client like Cantata |
 | PC | Windows/macOS/Linux with SMB support | For dropping music onto the share |
 
 ## 2. Prepare the board
@@ -88,11 +88,32 @@ Result on the tested dongle (Comtrue bridge, ES9039, `2fc6:f802`, kernel 6.1): P
 
 ## 5. Control from the phone
 
-1. Install **M.A.L.P.** (Android) or any MPD client.
-2. Add a server: the board's IP address (shown by `hostname -I`) or `<hostname>.local`, port `6600`.
-3. You get: library browsing, queue, play/pause/next, volume (through the DAC's own USB
-   volume control when it has one), stored playlists, and **Outputs** to switch between DACs
-   when several are attached.
+Two ways; both talk to the same MPD, so you can mix them.
+
+### 5.1 Browser, no app (myMPD)
+
+Install the web client on the board with `sudo ./install.sh ... --with-mympd` (or later:
+the same steps are in `install.sh` §6; Debian 12/13 on arm64/amd64, other architectures
+build it from source). Then open `http://<board-ip>/` on the phone. Library, queue,
+transport, volume, playlists, **Outputs**, web radio and smart playlists are all there. To
+pin it as an app icon with full-screen behaviour, open `https://<board-ip>/` once, accept
+the self-signed certificate, and use the browser's "Add to Home screen".
+
+### 5.2 Native app (M.A.L.P. or any MPD client)
+
+- **Play Store note:** on Android 14 and newer the Play Store shows "not available for your
+  device" for M.A.L.P. because the app targets an older Android SDK level. It still installs
+  and runs fine; get it from **F-Droid** (install the F-Droid client from f-droid.org, search
+  "M.A.L.P."), or download the APK from
+  https://f-droid.org/packages/org.gateshipone.malp/ and allow "install unknown apps" for
+  your browser once.
+- Alternatives: MAFA (closed source, APK from its website), or any desktop client such as
+  Cantata on the PC.
+- Add a server: the board's IP address (shown by `hostname -I`) or `<hostname>.local`,
+  port `6600`.
+- You get: library browsing, queue, play/pause/next, volume (through the DAC's own USB
+  volume control when it has one), stored playlists, and **Outputs** to switch between DACs
+  when several are attached.
 
 Volume note: the DAC's USB volume control works for PCM and for native DSD on the chips
 tested. When playing DoP through a DAC that scales samples in its USB bridge, changing the

@@ -52,11 +52,12 @@ The design is architecture-neutral (armhf, arm64, riscv64). What matters:
 scp -r deploy user@board:~/hifi/
 ssh user@board
 cd ~/hifi/deploy/scripts && chmod +x *.sh
-sudo ./install.sh --disk /dev/sdb1 --format     # or --disk-label hifi / --no-disk
-sudo ./test-audio.sh                            # proves the bit-perfect path
+sudo ./install.sh --disk /dev/sdb1 --format --with-mympd   # or --disk-label hifi / --no-disk
+sudo ./test-audio.sh                                        # proves the bit-perfect path
 ```
 
-Then add the server (port 6600) in M.A.L.P. on the phone and drop music onto `\\board\music`.
+Then open `http://<board-ip>/` on the phone (myMPD web client, no app needed) or add the
+server (port 6600) in M.A.L.P. from F-Droid, and drop music onto `\\board\music`.
 Full instructions and troubleshooting: [docs/USER-MANUAL.md](docs/USER-MANUAL.md).
 
 ## Next step

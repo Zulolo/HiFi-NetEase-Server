@@ -3,7 +3,7 @@
 #
 #   sudo ./install.sh [--disk /dev/sdX1 [--format] | --disk-label hifi | --no-disk]
 #                     [--no-samba] [--samba-user NAME] [--no-wifi-watchdog] [--no-native-dsd]
-#                     [--dac-name VID:PID=ALSAID]...
+#                     [--dac-name VID:PID=ALSAID]... [--with-mympd]
 #
 # What it does (each step is a separate script you can re-run alone):
 #   1. packages: mpd (0.24 from backports on Debian 12), mpc, alsa-utils, ffmpeg, avahi, samba, inotify-tools, f3
@@ -11,18 +11,20 @@
 #   3. dac-setup.sh    stable ALSA names, native-DSD quirk when possible, capability record
 #   4. gen-mpd-conf.sh /etc/mpd.conf with one output per DAC, bit-perfect settings
 #   5. samba share on /srv/music/local, avahi advertisement, optional Wi-Fi watchdog
-#   6. enable services and print how to connect from the phone
+#   6. optional myMPD web client (--with-mympd; Debian 12/13 on amd64/arm64 via the upstream OBS repo),
+#      served on http://board/ (port 80) and https://board/ (443) so phones need no app
+#   7. enable services and print how to connect from the phone
 #
 # Tested: Orange Pi Zero 3 (Debian 12, kernel 6.1) with a Comtrue/ES9039 dongle. Should work on
 # Raspberry Pi OS, Armbian and stock Debian 12/13 on arm64, armhf and riscv64.
 
 DIR=$(cd "$(dirname "$0")" && pwd); . "$DIR/lib.sh"
 need_root
-DISK=""; DISK_LABEL=""; FORMAT=""; NO_DISK=0; SAMBA=1; SAMBA_USER=hifi; WATCHDOG=auto; NATIVE_DSD="--try-native-dsd"; DAC_NAMES=()
+DISK=""; DISK_LABEL=""; FORMAT=""; NO_DISK=0; SAMBA=1; SAMBA_USER=hifi; WATCHDOG=auto; NATIVE_DSD="--try-native-dsd"; DAC_NAMES=(); MYMPD=0
 while [ $# -gt 0 ]; do case "$1" in
   --disk) DISK=$2; shift;; --disk-label) DISK_LABEL=$2; shift;; --format) FORMAT=--format;; --no-disk) NO_DISK=1;;
   --no-samba) SAMBA=0;; --samba-user) SAMBA_USER=$2; shift;; --no-wifi-watchdog) WATCHDOG=0;;
-  --no-native-dsd) NATIVE_DSD="";; --dac-name) DAC_NAMES+=(--name "$2"); shift;;
+  --no-native-dsd) NATIVE_DSD="";; --dac-name) DAC_NAMES+=(--name "$2"); shift;; --with-mympd) MYMPD=1;;
   -h|--help) sed -n '2,20p' "$0"; exit 0;; *) die "unknown option $1 (try --help)";; esac; shift; done
 [ -n "$DISK$DISK_LABEL" ] || [ $NO_DISK -eq 1 ] || die "choose --disk /dev/sdX1 [--format], --disk-label LABEL, or --no-disk"
 
@@ -95,13 +97,32 @@ if [ "$WATCHDOG" != 0 ] && [ -n "$WIFI_IF" ]; then
   log "Wi-Fi watchdog enabled on $WIFI_IF (default route is wireless)"
 fi
 
-# ---- 6. services + summary --------------------------------------------------------------------------
+# ---- 6. optional myMPD web client -------------------------------------------------------------------
+if [ $MYMPD -eq 1 ]; then
+  ARCH=$(dpkg --print-architecture); DEBVER=$(. /etc/os-release; echo "${VERSION_ID:-12}")
+  case "$ARCH" in amd64|arm64) ;; *) warn "myMPD has no upstream package for $ARCH; build it from source (https://jcorporation.github.io/myMPD)"; MYMPD=0;; esac
+  if [ $MYMPD -eq 1 ]; then
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL "https://download.opensuse.org/repositories/home:jcorporation/Debian_${DEBVER}/Release.key" | gpg --dearmor -o /etc/apt/keyrings/mympd.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/mympd.gpg] https://download.opensuse.org/repositories/home:/jcorporation/Debian_${DEBVER}/ /" > /etc/apt/sources.list.d/mympd.list
+    apt-get update -q && $APT install mympd
+    mkdir -p /var/lib/mympd/config
+    printf '/run/mpd/socket' > /var/lib/mympd/config/mpd_host
+    printf '%s' "$MUSIC_DIR" > /var/lib/mympd/config/mpd_music_directory
+    printf 80 > /var/lib/mympd/config/http_port; printf 443 > /var/lib/mympd/config/ssl_port   # 8080 is reserved for hifid
+    chown -R mympd:mympd /var/lib/mympd 2>/dev/null || true
+    systemctl enable --now mympd >/dev/null 2>&1 && log "myMPD $(mympd --version 2>/dev/null | awk '{print $2}') on http://$(hostname -I | awk '{print $1}')/"
+  fi
+fi
+
+# ---- 7. services + summary --------------------------------------------------------------------------
 systemctl daemon-reload
 systemctl enable --now mpd >/dev/null 2>&1; sleep 2
 IP=$(hostname -I | awk '{print $1}')
 echo; log "DONE. Summary:"
 echo "  MPD $(mpd --version | head -1 | awk '{print $NF}'): $(systemctl is-active mpd), outputs:"; mpc outputs | sed 's/^/     /'
 [ $SAMBA -eq 1 ] && echo "  Samba share: \\\\$IP\\music  (user/password in $HIFI_ETC/samba.txt)"
-echo "  Phone: install M.A.L.P. (F-Droid/Play), add server $IP port 6600, or use hostname $(hostname).local"
+[ $MYMPD -eq 1 ] && echo "  Web client (no app needed): http://$IP/  (https://$IP/ to install it as a phone app)"
+echo "  Phone app: M.A.L.P. from F-Droid (the Play Store hides it on new Android), server $IP port 6600, or hostname $(hostname).local"
 echo "  Test the audio path: sudo $DIR/test-audio.sh [--dsd /path/to/file.dsf]"
 echo "  DAC details: $HIFI_DACS_CONF ; regenerate config after plugging a new DAC: dac-setup.sh && gen-mpd-conf.sh && systemctl restart mpd"
