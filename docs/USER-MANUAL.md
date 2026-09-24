@@ -99,6 +99,12 @@ transport, volume, playlists, **Outputs**, web radio and smart playlists are all
 pin it as an app icon with full-screen behaviour, open `https://<board-ip>/` once, accept
 the self-signed certificate, and use the browser's "Add to Home screen".
 
+**Queue vs. library.** MPD keeps two lists: the *library* (everything on the disk, indexed
+automatically) and the *queue* (what will play now). New files never appear in the queue by
+themselves. In myMPD open the database icon in the left bar, choose *Filesystem* or *Albums*,
+find the folder or album, and use its menu to *Append to queue* or *Play*. The same applies
+in M.A.L.P. (Library tab → long-press → add to queue).
+
 ### 5.2 Native app (M.A.L.P. or any MPD client)
 
 - **Play Store note:** on Android 14 and newer the Play Store shows "not available for your
