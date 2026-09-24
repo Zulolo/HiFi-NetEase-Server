@@ -35,7 +35,7 @@ Original plan, kept for readers repeating it on other hardware:
 Exit criteria: 24 h of 24/192 local playback without dropouts; each dongle's best DSD mode
 known; Wi-Fi outages ≤ 60 s and loss ≤ 2 %, otherwise escalate (USB Wi-Fi adapter, then RV).
 
-## M1 · NetEase via MPD, interim tools · step 1 done 2026-09-24
+## M1 · NetEase via MPD, interim tools · steps 1-3 done 2026-09-24
 
 Step 1 result: the NetEase API, the account's entitlement and the end-to-end audio path are
 verified on the board with `ncmctl` v0.8.1 (the ADR-0002 library, arm64 release binary). QR
@@ -44,6 +44,15 @@ login works and the session survives restarts; the SVIP account resolves `jymast
 Playing a resolved stream exposed the CDN `Content-Type` defect that makes redirect mode
 unusable and pipe mode mandatory — see ADR-0008. With a pipe proxy, MPD delivered the stream
 to the ES9039 dongle as bit-perfect `S24_3LE @ 192000 Hz` at 0.6 % CPU.
+
+Steps 2 and 3 result: `hifid` v0.1.0-m1 is built and deployed as a managed systemd service
+(`deploy/scripts/install-hifid.sh`). It runs as an unprivileged `hifid` user at ~8 MB RSS,
+reaches MPD over `/run/mpd/socket` even under `ProtectSystem=strict`, serves the REST +
+WebSocket API and the embedded PWA on port 8080, and comes back by itself after a reboot
+(boot to ready unchanged at 25 s, NFR-2). `format.delivery` is cross-checked against
+`/proc/asound/.../hw_params`: a DSD256 file reports `native-dsd, 11289600, DSD_U32_BE @
+352800`, matching the kernel exactly (FR-4.6). go-musicfox was not needed: `ncmctl` covered
+the step-1 validation and is the same library the M2 adapter will use.
 
 Goal: listen to the NetEase library on the Acton IV from the phone, using existing software.
 

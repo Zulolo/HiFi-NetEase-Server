@@ -7,6 +7,7 @@ Orange Pi Zero 3 (Debian 12, kernel 6.1) with a Comtrue/ES9039 USB dongle on 202
 | Script | Purpose |
 |---|---|
 | `install.sh` | One-shot setup: packages (mpd 0.24 from backports on Debian 12), disk, DAC detection, MPD config, Samba share, Avahi, Wi-Fi watchdog, services. `--help` lists the options. |
+| `install-hifid.sh` | Installs the `hifid` control service as a managed systemd unit: creates the `hifid` system user, `/etc/hifid/config.yaml` and a generated API token in `/etc/hifid/env`, installs the binary to `/usr/local/bin` and enables `hifid.service`. Re-runnable; keeps an existing config and token. |
 | `setup-disk.sh` | Format (only with `--format`) and mount the music disk at `/srv/hifi` with `/srv/music` and `/srv/data` bind mounts; `--local` keeps everything on the OS card. |
 | `dac-setup.sh` | Enumerate USB DACs, write a udev rule for stable ALSA names, apply the name immediately, record capabilities in `/etc/hifi/dacs.conf`; `--try-native-dsd` adds and persists the `snd-usb-audio` DSD quirk when a DAC advertises raw DSD the kernel did not enable (legacy `0x8000` form below kernel 6.18, `VID:PID:dsd_raw` from 6.18). |
 | `gen-mpd-conf.sh` | Render `/etc/mpd.conf` from `../mpd/mpd.conf.template`: one bit-perfect `audio_output` per DAC (`dop`, `allowed_formats`, hardware mixer when present), buffer sized by RAM, user region preserved, previous file backed up. |

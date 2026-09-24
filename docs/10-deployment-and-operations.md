@@ -24,7 +24,7 @@ confirm the router does not enable AP/client isolation (it blocks mDNS and Samba
    mkdir -p /srv/music/{local,netease,playlists} /srv/data/{mpd,hifid,incoming} ; chown mpd:audio / hifid:audio
 4. udev: copy deploy/udev/90-hifi-dac.rules ; udevadm control --reload ; replug dongles ; check /proc/asound/cards
 5. MPD: copy deploy/mpd/mpd.conf.example -> /etc/mpd.conf (hifid regenerates it later) ; drop-in deploy/systemd/mpd.service.d/override.conf
-6. hifid: copy binary to /usr/local/bin/hifid ; /etc/hifid/config.yaml ; /etc/hifid/env (token, secret) ; deploy/systemd/hifid.service ; systemctl enable --now hifid
+6. hifid: build it (`cd server && go build -o dist/hifid ./cmd/hifid`), then `sudo deploy/scripts/install-hifid.sh --binary server/dist/hifid` — it creates the `hifid` system user, `/etc/hifid/config.yaml`, a generated token in `/etc/hifid/env` (0640 root:hifid), installs the binary and enables `hifid.service`. Re-running keeps an existing config and token.
 7. Verify: mpc outputs ; curl http://hifi.local:8080/api/v1/system/status ; open http://hifi.local:8080 on the phone
 ```
 
