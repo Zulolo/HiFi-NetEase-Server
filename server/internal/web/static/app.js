@@ -35,6 +35,10 @@ function fmtLabel(f) {
 function render(st) {
   if (!st) return;
   $("dot").className = "dot" + (st.connected ? " ok" : "");
+  const playing = st.state === "play";
+  const pp = $("playpause");
+  pp.textContent = playing ? "⏸" : "▶";
+  pp.setAttribute("aria-label", playing ? "Pause" : "Play");
   const song = st.song || {};
   $("title").textContent = song.title || "Nothing playing";
   $("artist").textContent = [song.artist, song.album].filter(Boolean).join(" — ");
