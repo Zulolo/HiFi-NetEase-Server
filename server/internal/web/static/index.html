@@ -13,11 +13,25 @@
          font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   h1 { font-size:17px; margin:0; font-weight:600; letter-spacing:.2px; }
   .top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 14px; }
-  .sys { display:flex; flex-wrap:wrap; gap:4px 14px; color:var(--mut); font-size:12px; font-variant-numeric:tabular-nums; }
-  .sys span { white-space:nowrap; }
-  .sys b { color:var(--fg); font-weight:500; }
-  .sys .warn b { color:#e0a030; }
-  .sys .hot b { color:#d9534f; }
+  .sys { display:flex; flex-wrap:wrap; gap:6px; font-variant-numeric:tabular-nums; }
+  .tile { flex:0 0 auto; background:var(--card); border-radius:8px; padding:5px 9px 4px; display:grid;
+          grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:8px; align-items:center; }
+  .tile .l { grid-column:1; grid-row:1; font-size:10px; letter-spacing:.6px; text-transform:uppercase; color:var(--mut); }
+  .tile .v { grid-column:1; grid-row:2; font-size:14px; font-weight:600; color:var(--fg); text-align:right; white-space:pre; }
+  .tile .s { grid-column:1 / span 2; grid-row:3; font-size:10px; color:var(--mut); white-space:pre; }
+  .tile .ind { grid-column:2; grid-row:1 / span 2; align-self:end; }
+  .tile.warn .v { color:#e0a030; } .tile.hot .v { color:#d9534f; }
+  .spark { display:block; width:64px; height:22px; }
+  .spark polyline { fill:none; stroke:var(--acc); stroke-width:1.4; stroke-linejoin:round; }
+  .spark polygon { fill:var(--acc); opacity:.14; }
+  .tile.warn .spark polyline, .tile.warn .spark polygon { stroke:#e0a030; fill:#e0a030; }
+  .tile.hot .spark polyline, .tile.hot .spark polygon { stroke:#d9534f; fill:#d9534f; }
+  .bar2 { width:64px; height:6px; background:#2a3138; border-radius:3px; overflow:hidden; margin-bottom:4px; }
+  .bar2 i { display:block; height:100%; background:var(--acc); }
+  .sig { display:flex; gap:2px; align-items:flex-end; height:14px; margin-bottom:4px; }
+  .sig i { width:5px; background:#2a3138; border-radius:1px; }
+  .sig i.on { background:var(--acc); }
+  .sig i:nth-child(1){height:5px} .sig i:nth-child(2){height:8px} .sig i:nth-child(3){height:11px} .sig i:nth-child(4){height:14px}
   .card { background:var(--card); border-radius:12px; padding:14px; margin-bottom:12px; }
   .title { font-size:19px; font-weight:600; margin-bottom:2px; word-break:break-word; }
   .sub { color:var(--mut); font-size:14px; }

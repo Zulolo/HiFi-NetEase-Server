@@ -622,25 +622,56 @@ async function playHere(row, ref, items, title, done) {
   }
 }
 
-// ---- board status strip --------------------------------------------------------
-// CPU, RAM, temperature, Wi-Fi throughput and signal, uptime, process memory.
+
+// ---- board status tiles --------------------------------------------------------
+// Fixed-width tiles (values live in fixed character boxes) so nothing shifts as
+// numbers change; sparklines keep the last two minutes at a 3 s cadence.
 const sysEl = $("sys");
-const fmtRate = (bps) => (bps >= 1e6 ? (bps / 1e6).toFixed(1) + " MB/s" : bps >= 1e3 ? Math.round(bps / 1e3) + " kB/s" : Math.round(bps) + " B/s");
-const fmtUp = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
+const HIST_N = 40;
+const hist = { cpu: [], temp: [], rx: [] };
+const push = (k, v) => { hist[k].push(v); if (hist[k].length > HIST_N) hist[k].shift(); };
+const padL = (s, n) => String(s).padStart(n, " ");
+
+function spark(vals, lo, hi, w = 64, h = 22) {
+  if (vals.length < 2) return `<svg class="spark" viewBox="0 0 ${w} ${h}"></svg>`;
+  const step = w / (HIST_N - 1), off = HIST_N - vals.length;
+  const y = (v) => (h - 1 - ((Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * (h - 3)).toFixed(1);
+  const pts = vals.map((v, i) => `${((off + i) * step).toFixed(1)},${y(v)}`);
+  const x0 = (off * step).toFixed(1), x1 = ((off + vals.length - 1) * step).toFixed(1);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polygon points="${x0},${h} ${pts.join(" ")} ${x1},${h}"/><polyline points="${pts.join(" ")}"/></svg>`;
+}
+const rateFixed = (bps) => { // always 8 chars: "  1.3 MB" / " 12  kB" style, unit /s implied
+  if (bps >= 1e6) return padL((bps / 1e6).toFixed(1) + " MB", 8);
+  if (bps >= 1e3) return padL(Math.round(bps / 1e3) + " kB", 8);
+  return padL(Math.round(bps) + " B", 8);
+};
+const fmtUp = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${padL(h, 2)}h` : `${padL(h, 2)}h ${padL(m, 2)}m`; };
+const tile = (cls, label, value, sub, ind) =>
+  `<div class="tile ${cls}"><div class="l">${label}</div><div class="v">${value}</div><div class="s">${sub}</div><div class="ind">${ind}</div></div>`;
+
 async function refreshSys() {
   const s = await call("/system/stats", "GET");
-  if (!s || s.mem_total === undefined) { sysEl.textContent = ""; return; }
+  if (!s || s.mem_total === undefined) { sysEl.innerHTML = ""; return; }
+  push("cpu", s.cpu_percent); push("temp", s.temp_c || 0); push("rx", s.net_rx_bps);
   const tempCls = s.temp_c >= 80 ? "hot" : s.temp_c >= 70 ? "warn" : "";
   const cpuCls = s.cpu_percent >= 85 ? "warn" : "";
-  const parts = [
-    `<span class="${cpuCls}">CPU <b>${s.cpu_percent.toFixed(0)}%</b>${s.cpu_mhz ? ` @ ${(s.cpu_mhz / 1000).toFixed(1)} GHz` : ""} · load ${s.load1.toFixed(2)}</span>`,
-    `<span>RAM <b>${fmtBytes(s.mem_used)}</b> / ${fmtBytes(s.mem_total)}</span>`,
-  ];
-  if (s.temp_c) parts.push(`<span class="${tempCls}">SoC <b>${s.temp_c.toFixed(0)} °C</b></span>`);
-  parts.push(`<span>Wi-Fi ↓<b>${fmtRate(s.net_rx_bps)}</b> ↑${fmtRate(s.net_tx_bps)}${s.wifi_dbm ? ` · ${s.wifi_dbm} dBm` : ""}</span>`);
-  parts.push(`<span>hifid ${fmtBytes(s.hifid_rss)} · mpd ${fmtBytes(s.mpd_rss)}</span>`);
-  parts.push(`<span>up <b>${fmtUp(s.uptime_sec)}</b></span>`);
-  sysEl.innerHTML = parts.join("");
+  const rxMax = Math.max(50e3, ...hist.rx);
+  const bars = s.wifi_dbm >= -55 ? 4 : s.wifi_dbm >= -65 ? 3 : s.wifi_dbm >= -75 ? 2 : 1;
+  const sig = `<div class="sig">${[1, 2, 3, 4].map((i) => `<i class="${i <= bars ? "on" : ""}"></i>`).join("")}</div>`;
+  const ramPct = (100 * s.mem_used) / s.mem_total;
+  sysEl.innerHTML = [
+    tile(cpuCls, "cpu", padL(s.cpu_percent.toFixed(0), 3) + " %",
+      `${padL((s.cpu_mhz / 1000).toFixed(1), 4)} GHz  ld ${s.load1.toFixed(2)}`, spark(hist.cpu, 0, 100)),
+    tile("", "ram", padL(fmtBytes(s.mem_used), 7),
+      `of ${fmtBytes(s.mem_total)}  ${padL(ramPct.toFixed(0), 3)} %`, `<div class="bar2"><i style="width:${ramPct.toFixed(0)}%"></i></div>`),
+    tile(tempCls, "soc", padL((s.temp_c || 0).toFixed(0), 3) + " °C",
+      (s.temp_zone || "").replace("-thermal", "").padEnd(12), spark(hist.temp, 30, 90)),
+    tile("", "wi-fi ↓", rateFixed(s.net_rx_bps) + "/s",
+      `↑${rateFixed(s.net_tx_bps)}/s  ${padL(s.wifi_dbm || 0, 4)} dBm`, spark(hist.rx, 0, rxMax)),
+    tile("", "signal", padL(s.wifi_quality || 0, 3) + " q", `${padL(s.wifi_dbm || 0, 4)} dBm`, sig),
+    tile("", "hifid · mpd", padL(fmtBytes(s.hifid_rss), 7), `mpd ${padL(fmtBytes(s.mpd_rss), 7)}`, ""),
+    tile("", "uptime", fmtUp(s.uptime_sec), `${s.cpu_cores} cores`, ""),
+  ].join("");
 }
 refreshSys();
 setInterval(refreshSys, 3000);
