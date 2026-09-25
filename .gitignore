@@ -15,3 +15,18 @@ probe-*.txt
 .idea/
 Thumbs.db
 .DS_Store
+
+# hifid runtime state and session material: never commit, even from a checkout on the board
+cookie.json
+cookie.json.*
+.cookie.json-*
+downloads.json
+downloads-queue.json
+sync.json
+.ncmctl/
+anonymous_token
+header.yaml
+qrcode*.png
+hifid-qr*.png
+*.nmconnection
+config.yaml.local
