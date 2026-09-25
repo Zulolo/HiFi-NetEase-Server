@@ -2,7 +2,9 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 )
@@ -270,4 +272,29 @@ func (s *Server) ncmDaily(w http.ResponseWriter, r *http.Request) {
 		tracks = []netease.Track{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": tracks, "total": len(tracks)})
+}
+
+// ncmExportPlaylist answers POST /api/v1/netease/playlists/{id}/export {name}
+// by writing "NetEase - <name>.m3u" into MPD's playlist directory (docs/08 §6).
+func (s *Server) ncmExportPlaylist(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "playlist id must be numeric")
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	_ = decode(r, &req)
+	dir := filepath.Join(s.cfg.Paths.Music, "playlists")
+	base := strings.TrimSuffix(s.streamURL(0), "/stream/ncm/0")
+	file, n, err := s.ncm.ExportPlaylist(r.Context(), id, req.Name, dir, base)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"file": file, "tracks": n})
 }

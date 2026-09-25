@@ -295,6 +295,7 @@ fetch(API + "/netease/status")
 // the desktop client's 音质播放设置 / 音质下载设置.
 const dlLine = $("dl-status");
 const dlBtn = $("dl-playlist");
+const plExport = $("pl-export");
 let viewingPlaylist = null;
 let queuedIDs = new Set();
 
@@ -312,11 +313,22 @@ function renderDownloads(s) {
   if (s.failed && s.failed.length) bits.push(`${s.failed.length} failed`);
   dlLine.textContent = bits.join(" · ");
   dlBtn.hidden = viewingPlaylist === null;
+  plExport.hidden = viewingPlaylist === null;
 }
 
 async function refreshDownloads() {
   renderDownloads(await call("/netease/downloads", "GET"));
 }
+
+plExport.onclick = async () => {
+  if (viewingPlaylist === null) return;
+  const label = plExport.textContent;
+  plExport.textContent = "…";
+  const r = await call("/netease/playlists/" + viewingPlaylist + "/export", "POST", { name: bTitle.textContent });
+  plExport.textContent = label;
+  if (r && r.file) setStatus(r.tracks + " tracks written to playlists/" + r.file + " (load it from any MPD client)");
+  else setStatus("export failed");
+};
 
 dlBtn.onclick = async () => {
   if (viewingPlaylist === null) return;
@@ -350,6 +362,7 @@ function setMode(m) {
   dlPanel.hidden = m !== "dl";
   if (m !== "dl") clearInterval(dlTimer);
   dlBtn.hidden = true;
+  plExport.hidden = true;
   setPlayAll(null);
   if (m === "ncm") { libSearch.value = ""; showPlaylists(); }
   else if (m === "lib") { libPath = ""; showLibrary(""); }
@@ -418,7 +431,65 @@ async function showLibrary(p) {
   setPlayAll(files.length ? async () => call("/queue", "POST", {
     items: files.map((x) => ({ ref: "local:" + x.path })), mode: "replace", play: true,
   }) : null);
+  if (r.at_root) {
+    bList.appendChild(tagRow("artist", "🎤", "Artists", "everything on disk, by artist tag"));
+    bList.appendChild(tagRow("album", "💿", "Albums", "everything on disk, by album tag"));
+  }
   r.items.forEach((e) => bList.appendChild(libRow(e)));
+}
+
+function tagRow(tag, icon, name, sub) {
+  const li = document.createElement("li");
+  li.innerHTML = `<div class="ico">${icon}</div><div class="txt"><div class="n">${name}</div><div class="s">${sub}</div></div>`;
+  li.onclick = () => showTagList(tag);
+  return li;
+}
+
+async function showTagList(tag) {
+  const label = tag === "artist" ? "Artists" : "Albums";
+  bTitle.textContent = label;
+  setStatus("loading…");
+  bList.innerHTML = "";
+  bBack.hidden = false;
+  bBack.onclick = () => showLibrary("");
+  setPlayAll(null);
+  currentEntries = [];
+  const r = await call("/library/tags?tag=" + tag, "GET");
+  if (!r) { setStatus("library unavailable"); return; }
+  setStatus(`${r.items.length} ${label.toLowerCase()}`);
+  r.items.forEach((v) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="ico">${tag === "artist" ? "🎤" : "💿"}</div>`;
+    const txt = document.createElement("div");
+    txt.className = "txt";
+    const n = document.createElement("div");
+    n.className = "n";
+    n.textContent = v;
+    txt.appendChild(n);
+    li.appendChild(txt);
+    li.onclick = () => showTagTracks(tag, v);
+    bList.appendChild(li);
+  });
+}
+
+async function showTagTracks(tag, value) {
+  bTitle.textContent = value;
+  setStatus("loading…");
+  bList.innerHTML = "";
+  bBack.hidden = false;
+  bBack.onclick = () => showTagList(tag);
+  const r = await call("/library/find?tag=" + tag + "&value=" + encodeURIComponent(value), "GET");
+  if (!r) { setStatus("library unavailable"); return; }
+  const files = r.items;
+  const bytes = files.reduce((a, e) => a + (e.size || 0), 0);
+  const secs = files.reduce((a, e) => a + (e.duration || 0), 0);
+  setStatus(`${files.length} file(s) · ${fmtBytes(bytes)} · ${mmss(secs)}`);
+  currentEntries = files;
+  setPlayAll(files.length ? async () => call("/queue", "POST", {
+    items: files.map((x) => ({ ref: "local:" + x.path })), mode: "replace", play: true,
+  }) : null);
+  files.forEach((e) => bList.appendChild(libRow(e)));
+  refresh();
 }
 
 async function runLibSearch(q) {
@@ -746,7 +817,18 @@ function renderTrackRows(items, statusText) {
     const li = document.createElement("li");
     const txt = document.createElement("div");
     txt.className = "txt";
-    txt.innerHTML = `<div class="n">${t.title}</div><div class="s">${t.artist}${t.album ? " — " + t.album : ""}</div>`;
+    txt.innerHTML = `<div class="n">${t.title}</div><div class="s"></div>`;
+    // artist and album are links: tap one to search NetEase for it
+    const sub = txt.querySelector(".s");
+    const lnk = (q) => {
+      const el = document.createElement("span");
+      el.className = "lnk";
+      el.textContent = q;
+      el.onclick = (e) => { e.stopPropagation(); ncmSearch.value = q; runNcmSearch(q); };
+      return el;
+    };
+    if (t.artist) sub.appendChild(lnk(t.artist));
+    if (t.album) { sub.append(t.artist ? " — " : ""); sub.appendChild(lnk(t.album)); }
     li.innerHTML = img(t.cover);
     li.appendChild(txt);
     const dl = document.createElement("button");

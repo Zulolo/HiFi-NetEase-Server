@@ -102,7 +102,7 @@ the file rendered on the verified board. Until `hifid` exists, re-run the two sc
 - Bind to the LAN; no port forwarding on the router; no TLS required for LAN control
   (optional TLS for PWA install, docs/06 §4.4).
 - API token in `/etc/hifid/env` (0600), generated at install, shown once and as a QR.
-- NetEase cookie file encrypted with a key from `/etc/machine-id` + secret; never logged.
+- NetEase cookie file: **not encrypted** (decision 2026-09-25: the key would live on the same card); it is 0600 under the `hifid` user in `/srv/data/hifid/netease/`, never logged, excluded from git.
 - Upload path sanitisation and extension allow-list; tus temp dir on the data disk.
 - `hifid` has no shell access to the system beyond the `mpd.conf` apply path.
 - Debian unattended-upgrades for security updates; MPD/kernel updates are manual (a kernel
@@ -122,7 +122,7 @@ the file rendered on the verified board. Until `hifid` exists, re-run the two sc
 | What | Where | How |
 |---|---|---|
 | Music (`/srv/music`) | owner's data | `deploy/scripts/backup.sh` → rsync to the PC or a second disk; never automatic |
-| `/srv/data/hifid` (index, session, covers, per-DAC settings) | small | included in `backup.sh` |
+| `/srv/data/hifid` (download index + list, session cookie), `/srv/data/mpd`, `/srv/music/playlists`, `/etc/hifid`, `/etc/mpd.conf`, Samba config | small | `sudo deploy/scripts/backup-hifid.sh [DEST]` → one 0600 tarball (keeps the newest 10); `--restore FILE` stops mpd+hifid, extracts, restarts |
 | `/etc/hifid`, `/etc/mpd.conf`, udev rule | tiny | included |
 | MPD DB | rebuildable | not backed up |
 

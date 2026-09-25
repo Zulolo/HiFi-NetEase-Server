@@ -132,7 +132,7 @@ POST /netease/downloads/pause | /resume -> download-list status (`paused` flag p
 GET  /netease/search?q=&offset&limit  -> {"query":"…","items":Track[],"total":327}   // songs only for now; Track as in playlist rows
 GET  /netease/cloud?offset&limit     -> CloudSong[]
 GET  /netease/song/{id}              -> Song + {"levels_available":["standard","exhigh","lossless","hires"],"trial":false,"local_copy":"netease/…/x.flac"|null}
-POST /netease/playlists/export       {}                 // regenerate MPD stored playlists (docs/08 §6)
+POST /netease/playlists/{id}/export  {"name":"…"}     -> {"file":"NetEase - <name>.m3u","tracks":1473}   // on demand, docs/08 §6
 
 Song = { "ref":"ncm:123","id":123,"title":"…","artists":[{"id":1,"name":"…"}],"album":{"id":9,"name":"…","cover":"…"},
          "duration":243,"fee":8,"max_level_hint":"hires" }
@@ -156,6 +156,11 @@ POST   /netease/sync/run             {} -> {"job":"sync_20260914"}     start a s
 ```
 
 ## 8. Local library (FR-3.3)
+
+As built (2026-09-25): `GET /library?path=` (folders, MPD `lsinfo`), `GET /library/search?q=`,
+`GET /library/stats`, `GET /library/tags?tag=artist|album` -> `{"items":[names]}`, and
+`GET /library/find?tag=&value=` -> `{"items":Entry[]}` (MPD `list` / `find`). The rest of
+this section is the original design and was not built.
 
 ```
 GET  /library/browse?path=           -> { "dirs":[…], "files":[ LocalSong ] }     (MPD lsinfo)

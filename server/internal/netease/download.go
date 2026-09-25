@@ -133,6 +133,10 @@ func (c *Client) Download(ctx context.Context, id int64) (string, error) {
 }
 
 // DownloadWithProgress is Download with a progress callback.
+// minFreeBytes is the headroom kept on the music disk: a download is refused
+// below it so a full disk never corrupts MPD's database or the state files.
+const minFreeBytes = 2 << 30
+
 func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Progress) (string, error) {
 	if c.musicDir == "" {
 		return "", errors.New("netease: music directory not configured")
@@ -159,6 +163,9 @@ func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Prog
 	relDir := filepath.Join("netease", artist, album)
 	rel := filepath.Join(relDir, title+"."+ext)
 	absDir := filepath.Join(c.musicDir, relDir)
+	if free, ok := freeBytes(c.musicDir); ok && free < minFreeBytes {
+		return "", fmt.Errorf("netease: music disk nearly full (%d MB free, keeps %d MB); download refused", free>>20, minFreeBytes>>20)
+	}
 	if err := os.MkdirAll(absDir, 0o775); err != nil {
 		return "", fmt.Errorf("netease: mkdir: %w", err)
 	}

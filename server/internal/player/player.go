@@ -551,3 +551,43 @@ func (p *Player) Stats() (map[string]string, error) {
 	})
 	return out, err
 }
+
+// ListTag returns the distinct values of one tag ("artist" or "album") in
+// the library, sorted case-insensitively. Empty values are dropped.
+func (p *Player) ListTag(tag string) ([]string, error) {
+	var out []string
+	err := p.with(func(c *mpd.Client) error {
+		vals, err := c.List(tag)
+		if err != nil {
+			return err
+		}
+		out = out[:0]
+		for _, v := range vals {
+			if strings.TrimSpace(v) != "" {
+				out = append(out, v)
+			}
+		}
+		return nil
+	})
+	sort.SliceStable(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
+	return out, err
+}
+
+// FindTag returns every song whose tag equals value exactly (MPD "find").
+func (p *Player) FindTag(tag, value string) ([]Entry, error) {
+	var out []Entry
+	err := p.with(func(c *mpd.Client) error {
+		rows, err := c.Find(tag, value)
+		if err != nil {
+			return err
+		}
+		out = out[:0]
+		for _, r := range rows {
+			if e, ok := entryFrom(r); ok {
+				out = append(out, e)
+			}
+		}
+		return nil
+	})
+	return out, err
+}

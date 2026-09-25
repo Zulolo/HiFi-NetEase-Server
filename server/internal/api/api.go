@@ -106,6 +106,8 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("GET /api/v1/library", g(s.getLibrary))
 	m.HandleFunc("GET /api/v1/library/search", g(s.searchLibrary))
 	m.HandleFunc("GET /api/v1/library/stats", g(s.libraryStats))
+	m.HandleFunc("GET /api/v1/library/tags", g(s.libraryTags))
+	m.HandleFunc("GET /api/v1/library/find", g(s.libraryFind))
 
 	m.HandleFunc("GET /api/v1/outputs", g(s.getOutputs))
 	m.HandleFunc("PUT /api/v1/outputs/{id}/active", g(s.setActiveOutput))
@@ -118,6 +120,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("GET /api/v1/netease/search", g(s.ncmSearch))
 	m.HandleFunc("GET /api/v1/netease/daily", g(s.ncmDaily))
 	m.HandleFunc("GET /api/v1/netease/playlists/{id}/tracks", g(s.ncmPlaylistTracks))
+	m.HandleFunc("POST /api/v1/netease/playlists/{id}/export", g(s.ncmExportPlaylist))
 	m.HandleFunc("POST /api/v1/netease/download", g(s.ncmDownload))
 	m.HandleFunc("POST /api/v1/netease/download/playlist", g(s.ncmDownloadPlaylist))
 	m.HandleFunc("GET /api/v1/netease/downloads", g(s.ncmDownloads))

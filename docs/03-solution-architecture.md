@@ -1,6 +1,10 @@
 # 03 · Solution and Architecture
 
-Status: draft v0.1 · 2026-09-13 · addresses all FR/NFR in docs/01
+Status: v1.0 · design 2026-09-13, as-built section added 2026-09-25
+
+> Sections 2–10 are the original design. **Section 11 describes what was actually built and
+> how `hifid`, MPD and NetEase work together on the board; read that first**, then use the
+> design sections for the reasoning behind it. Where they differ, §11.9 lists the changes.
 
 ## 1. Solution in one paragraph
 
@@ -217,3 +221,199 @@ Filesystem layout on the USB disk:
 - No database server (SQLite file suffices for the index; MPD keeps its own DB).
 - No reverse proxy required (nginx only if TLS is wanted for PWA install; docs/06).
 - No container runtime (Debian packages + one binary is simpler on 1 GB boards).
+
+## 11. As built (2026-09-25): how hifid, MPD and NetEase work together
+
+Everything below is what runs on `HiFi-Server.local` today (Orange Pi Zero 3, 2 GB, Debian 12,
+MPD 0.24, `hifid` 0.14). It is written to be read before a soak test: which process does what,
+what talks to what, and where state lives.
+
+### 11.1 The three parties
+
+```mermaid
+flowchart LR
+    subgraph Phone["Phone / PC browser"]
+        PWA["PWA at http://HiFi-Server.local/<br/>(embedded in hifid)"]
+        MALP["myMPD :8080 / M.A.L.P.<br/>(optional, MPD protocol)"]
+    end
+    subgraph Board["Orange Pi Zero 3"]
+        subgraph hifid["hifid (Go, user hifid, :80)"]
+            API["api: REST + WebSocket"]
+            PL["player: MPD adapter<br/>(gompd, unix socket)"]
+            NCM["netease: session, catalogue,<br/>quality ladders, downloads"]
+            PROXY["netease/proxy:<br/>/stream/ncm/{id}"]
+            WEB["web: embedded PWA"]
+            SYS["sysinfo: /proc, /sys"]
+        end
+        MPD["MPD 0.24 (user mpd)<br/>decode, queue, library DB,<br/>ALSA hw: output"]
+        SMB["smbd: share 'music'"]
+        DISK[("USB disk /srv/music<br/>local/  netease/  playlists/<br/>/srv/data/{mpd,hifid}")]
+        DAC["USB DAC (native DSD)"]
+    end
+    NET["NetEase API + CDN<br/>(only hifid talks to it)"]
+
+    PWA <-->|HTTP + WS| API
+    MALP <-->|:6600| MPD
+    API --> PL & NCM & SYS
+    PL <-->|MPD protocol| MPD
+    MPD -->|GET, loopback| PROXY
+    PROXY <-->|HTTPS| NET
+    NCM <-->|HTTPS| NET
+    NCM -->|writes downloads| DISK
+    MPD -->|reads files| DISK
+    SMB -->|writes uploads| DISK
+    MPD --> DAC
+```
+
+Three rules make the whole thing simple:
+
+1. **MPD is the only process that touches audio.** It decodes, keeps the play queue, indexes
+   the disk into its own database and writes to the DAC through ALSA `hw:` with no mixer or
+   resampler in the path. It knows nothing about NetEase.
+2. **hifid is the only process that talks to NetEase.** It holds the session cookie, resolves
+   stream URLs, downloads files and serves the phone UI. It never decodes audio.
+3. **The bridge between them is a URL.** For a NetEase track that is not on disk, hifid puts
+   `http://127.0.0.1:80/stream/ncm/<id>` in MPD's queue and MPD fetches it back from hifid
+   like any internet radio stream. For anything on disk, hifid puts the plain file path in the
+   queue and MPD reads the file itself.
+
+### 11.2 Processes and ports
+
+| Unit | User | Port | Role |
+|------|------|------|------|
+| `mpd.service` | `mpd` (audio) | 6600 | playback engine; `auto_update yes` (inotify inside MPD) so Samba drops are indexed without help |
+| `hifid.service` | `hifid` (audio) | 80 | REST/WS API, PWA, NetEase adapter, stream proxy, download worker, board stats |
+| `mympd.service` | dynamic | 8080 / 8443 | optional full MPD web client, same queue |
+| `smbd` | | 445 | share `music` = `/srv/music` (Explorer, Y: drive) |
+| `avahi-daemon` | | 5353/udp | `HiFi-Server.local` |
+| `wifi-watchdog.timer` | root | | reconnects wlan0 if the gateway stops answering |
+
+hifid runs under `NoNewPrivileges` + `ProtectSystem=strict`; it can write only `/srv/music`,
+`/srv/data/hifid`, `/srv/data/incoming` and `/run/hifid`. Two narrow exceptions cover the
+things it must do as an unprivileged user: `CAP_NET_BIND_SERVICE` for port 80, and a polkit
+rule that lets the `hifid` user ask logind for **power-off only** (the ⏻ button).
+
+### 11.3 Playing a NetEase track (pipe mode, ADR-0008)
+
+```mermaid
+sequenceDiagram
+    participant P as PWA
+    participant H as hifid api
+    participant N as hifid netease
+    participant M as MPD
+    participant C as NetEase API / CDN
+    P->>H: POST /api/v1/queue {items:[{ref:"ncm:123",title,artist,album}], mode:replace, play:true}
+    H->>N: LocalPath(123)?
+    alt copy on disk
+        H->>M: addid netease/Artist/Album/Title.flac
+    else not on disk
+        H->>M: addid http://127.0.0.1:80/stream/ncm/123
+        H->>M: addtagid Title / Artist / Album (so the queue shows names, not a URL)
+    end
+    H->>M: play
+    M->>H: GET /stream/ncm/123  (Range: bytes=0-)
+    H->>N: Resolve(123, stream ladder lossless→exhigh→higher→standard)
+    N->>C: song/url/v1 (cached until expiry)
+    C-->>N: CDN url, level granted, type flac
+    H->>C: GET cdn url (Range passed through)
+    C-->>H: bytes, Content-Type audio/mpeg (wrong)
+    H-->>M: 200/206, Content-Type audio/flac, 8 MB read-ahead, bytes piped
+    M->>M: decode FLAC → PCM 24/192 or 16/44.1
+    M-->>H: idle: player
+    H-->>P: ws {state:{song, elapsed, format:"PCM 24/192k · S24_LE"}}
+```
+
+Why pipe and not redirect: the CDN labels FLAC as `audio/mpeg`, and MPD's curl input trusts
+the header and picks the wrong decoder. hifid rewrites the header and adds an 8 MB
+read-ahead so a Wi-Fi hiccup does not reach the DAC. If the CDN URL dies mid-stream hifid
+re-resolves once and continues.
+
+Two quality ladders exist on purpose (docs/08 §4): **stream** tops out at lossless, because the
+Wi-Fi link measured 560–610 kB/s and a 24/192 master needs ~690 kB/s; **download** starts at
+jymaster (超清母带) because a file has no deadline. Both reject the surround "effect" variants
+(sky, jyeffect, dolby, vivid) so a stereo file is always chosen.
+
+### 11.4 Downloads: the explicit list
+
+Nothing downloads by itself. Playing or liking a track never fetches it; only what the owner
+adds to the download list (one track, or "Download all" on a playlist) is fetched. This
+mirrors the desktop client's 音质播放设置 = 无损 / 音质下载设置 = 超清母带.
+
+```mermaid
+flowchart TD
+    A["PWA: ↓ on a track or Download all"] --> B["POST /netease/download{,/playlist}"]
+    B --> C{"already on disk<br/>or already listed?"}
+    C -->|yes| Z["ignored (idempotent)"]
+    C -->|no| Q["Queue.pending (downloads-queue.json)"]
+    Q --> W["worker: one at a time, 5 s pace,<br/>paused flag honoured"]
+    W --> R["ResolveBest: download ladder,<br/>stereo variants only"]
+    R --> F["GET CDN → .part-* temp file<br/>(refused if disk < 2 GB free)"]
+    F --> T["ffmpeg -c copy: tags + cover"]
+    T --> M["atomic rename →<br/>netease/Artist/Album/Title.ext"]
+    M --> I["downloads.json index<br/>(id ↔ path, both directions)"]
+    I --> U["MPD update 'netease'"]
+    U --> V["PWA: green tick, local copy preferred from now on"]
+```
+
+Restart-safe: the in-flight item is persisted as `current` and goes back to the head on
+start; **Pause** cancels the transfer (temp file removed) and keeps it at the head; **Clear
+list** drops everything waiting. Retries: 3, then the item moves to `failed` and stays
+visible. The pace and single worker keep the account under NetEase's risk-control radar.
+
+### 11.5 Local files: Samba uploads and the library tab
+
+`smbd` writes into `/srv/music/local/`. MPD's own `auto_update` (inotify, depth 3) notices new
+files and re-indexes; hifid does not watch the tree. The Library tab is a thin view over MPD's
+database: folders via `lsinfo`, Artists/Albums via `list` + `find`, search via `search any`.
+Rows show size (from `stat` on the file), format, length and bitrate. The two roots are
+displayed as "Uploads" (`local/`) and "NetEase downloads" (`netease/`); the directory names on
+disk do not change because the share, the index and the docs refer to them.
+
+Play policy in one line: **a track plays from disk when a copy exists, otherwise it streams
+live at lossless.** hifid decides this at queue time by asking the download index.
+
+### 11.6 Live state
+
+MPD's `idle` command is the only push channel: hifid keeps one connection in `idle`, and every
+player / mixer / output / playlist event becomes a WebSocket frame to every phone. Elapsed
+time is not streamed; the PWA polls `/player` once a second only for the counter. Two phones
+therefore always agree, and M.A.L.P. or myMPD changes show up in the PWA the same way.
+
+### 11.7 State on disk
+
+| Path | Owner | What | Loss means |
+|------|-------|------|------------|
+| `/srv/music/local/` | share user (audio) | uploads | your music |
+| `/srv/music/netease/<Artist>/<Album>/<Title>.ext` | hifid | downloaded, tagged files | re-download |
+| `/srv/music/playlists/*.m3u` | hifid / mpd | MPD stored playlists, incl. exported NetEase lists | re-export |
+| `/srv/data/hifid/netease/downloads.json` | hifid | id ↔ path index | files look "not downloaded" until re-added (dedupe by path recovers) |
+| `/srv/data/hifid/netease/downloads-queue.json` | hifid | pending / failed / current / paused | pending list |
+| `/srv/data/hifid/netease/cookie.json` | hifid (0600) | NetEase session | scan the QR again |
+| `/srv/data/mpd/database`, `state`, `sticker.sql` | mpd | library DB, queue + position | MPD rescans on start; queue lost |
+| `/etc/hifid/config.yaml`, `/etc/hifid/env` | root:hifid (0640) | config, API token | re-run installer |
+
+`deploy/scripts/backup-hifid.sh` tars everything in this table except the music itself.
+
+### 11.8 Security boundary
+
+- Nothing on the board is reachable from outside the LAN unless the router forwards it;
+  there is no TLS on hifid (myMPD offers 8443 for its own UI).
+- hifid's API needs a Bearer token when `auth.mode: token`; the LAN default `admin` trusts
+  the LAN. The stream proxy path `/stream/ncm/*` is token-free because MPD fetches it, and is
+  meant to be loopback-only.
+- The NetEase cookie never leaves the board and is never logged; it is not encrypted at rest
+  (accepted: the key would sit beside it on the same card). Git ignores every state file.
+- The only privileged actions hifid can trigger are binding port 80 and powering off.
+
+### 11.9 What differs from the design (sections 2–10)
+
+| Design | As built | Why |
+|--------|----------|-----|
+| Stream proxy answers 302 to the CDN | Bytes piped through hifid with corrected `Content-Type` | CDN mislabels FLAC (ADR-0008) |
+| hifid generates `mpd.conf`, probes DACs, hot-plug | Hand-written `mpd.conf`, one DAC, output switching via MPD outputs | one dongle in use; M4 deferred |
+| tus browser upload + inotify watcher + SQLite index | Samba only; MPD `auto_update`; JSON index for downloads | owner's primary path is Explorer; simpler |
+| Offline sync scheduler for subscribed playlists | Explicit download list, paced worker | matches the desktop client's model (FR-1.7) |
+| hifid on 8080, MPD web client on 80 | hifid on 80, myMPD on 8080/8443 | hifid is the daily UI |
+| Cloud disk, daily recommendations, album/artist pages | Daily picks yes; cloud disk dropped; artist/album are search links | owner's choice, keep simple |
+| Cookie encrypted at rest, UDP discovery beacon | Plain 0600 file; mDNS only | key would be co-located; mDNS suffices |
+| Playlist export regenerated on a schedule | On demand per playlist (Export to MPD) | simple, no polling of NetEase |

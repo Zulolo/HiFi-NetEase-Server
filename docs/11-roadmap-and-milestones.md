@@ -117,8 +117,13 @@ Daily recommendations (每日推荐) landed the same day: `GET /netease/daily` w
 `RecommendSongs`; the PWA shows a "Daily picks" row at the top of the NetEase tab with its own
 play-all, and the page reuses the search-result renderer (play from here, download, on-disk).
 
-Still open in M2, none of it blocking daily use: album/artist pages from a search result, and
-playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
+M2 closed 2026-09-25 with the last two items kept deliberately small: in search results and
+daily picks the artist and album names are links that run a new search (no separate album or
+artist pages), and a playlist page has an "Export to MPD" button that writes
+`playlists/NetEase - <name>.m3u` on demand (`POST /netease/playlists/{id}/export`): tracks on
+disk as library paths, the rest as the loopback stream URL, so M.A.L.P. and myMPD can load
+it. Verified with the 1,473-track liked list (52 local paths, 1,421 stream URLs). Export is
+manual, not regenerated on a schedule. The download
 pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.
@@ -134,18 +139,27 @@ night; go-musicfox no longer needed.
 
 ## M3 · Import and library · ~1–2 weeks
 
-1. Samba share (installed in M0) wired to `hifid`: "recently added" index, duplicate warning.
+1. ~~Samba share (installed in M0) wired to `hifid`: "recently added" index, duplicate warning.~~
+   Dropped 2026-09-25 (owner: keep it simple). Samba drops are indexed by MPD's `auto_update`.
    (An inotify watcher is not needed: `mpd.conf` runs with `auto_update yes`, depth 3, so
    files dropped on the share are indexed by MPD itself; `hifid` adds targeted updates for
    its own downloads.)
-2. Library screens (artists/albums/folders/recent), `update` triggers, cover art.
-3. tus endpoint, finalize pipeline, hash verification (secondary path).
-4. Upload page in the PWA (drag-and-drop folders, parallel chunks, resume after reload).
+2. Library screens: folders (done in M1), Artists and Albums views added 2026-09-25 as plain
+   MPD `list` / `find` over the tag database (`GET /library/tags`, `GET /library/find`); no
+   cover art, no "recent" view (owner: keep it simple).
+3. ~~tus endpoint, finalize pipeline, hash verification (secondary path).~~ Not built: Samba
+   is the only import path and the owner is happy with it.
+4. ~~Upload page in the PWA.~~ Same.
 
 Exit criteria: FR-3 acceptance test (4 GB DSF folder over Wi-Fi, via Samba and via the web page)
 passes.
 
-## M4 · Output manager and DSD polish · ~1–2 weeks
+## M4 · Output manager and DSD polish · deferred
+
+Deferred 2026-09-25 until a second DAC is in use: one dongle (Comtrue XR768-9039, native DSD
+up to DSD256 verified) runs from the hand-written `mpd.conf`; output switching through MPD
+outputs already works from the PWA. `deploy/scripts/gen-mpd-conf.sh` and `probe-dac.sh` remain
+for the day a second dongle arrives.
 
 1. ALSA probe → capability JSON per dongle; stable ids from VID:PID:serial.
 2. `mpd.conf` generation with per-DAC blocks (dsd_mode, volume_mode, max_rate),
@@ -159,10 +173,20 @@ CS43131 dongle.
 
 ## M5 · Hardening · ~1 week
 
-1. 72 h soak test, RAM/CPU profile against NFR-3, boot-time measurement (NFR-2).
-2. Token auth, LAN binding audit, cookie encryption, log rotation.
-3. Backup/restore of `/srv/data/hifid` and the MPD DB; disk-full behaviour.
-4. Install script `deploy/scripts/install.sh` for a fresh Debian image on both boards.
+1. 72 h soak test, RAM/CPU profile against NFR-3, boot-time measurement (NFR-2). **Open**:
+   the owner runs it next; boot to ready measured at 25 s (M1), idle RSS hifid ≈ 20 MB.
+2. Token auth (done, `auth.mode: token` in config; `admin` mode is the LAN default), LAN
+   binding (0.0.0.0:80 on a LAN-only board, no forwarding), log rotation (journald,
+   `SystemMaxUse=20M` on the board, nothing else logs to files), cookie encryption at rest:
+   **accepted risk, not built** — the key would sit on the same SD card next to the file;
+   the cookie is 0600 in `/srv/data/hifid/netease` under the `hifid` user, and the backup
+   tarball is 0600 root.
+3. Backup/restore: `deploy/scripts/backup-hifid.sh` (2026-09-25) tars `/srv/data/hifid`,
+   `/srv/data/mpd`, `/srv/music/playlists`, `/etc/hifid`, `/etc/mpd.conf`, Samba config;
+   `--restore FILE` stops mpd+hifid, extracts, restarts. Disk-full: a download is refused
+   when the music disk has under 2 GB free (`minFreeBytes`), so MPD's database and the
+   state files never hit a full disk; uploads over Samba are bounded by the share itself.
+4. Install script `deploy/scripts/install.sh` + `install-hifid.sh` (done in M0/M1).
 
 ## M6 · Optional extensions (pick by value)
 

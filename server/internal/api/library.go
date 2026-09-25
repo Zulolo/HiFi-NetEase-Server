@@ -128,3 +128,42 @@ func (s *Server) libraryStats(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+// libraryTags answers GET /api/v1/library/tags?tag=artist|album with the
+// distinct values, for the Artists / Albums views.
+func (s *Server) libraryTags(w http.ResponseWriter, r *http.Request) {
+	tag := r.URL.Query().Get("tag")
+	if tag != "artist" && tag != "album" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "tag must be artist or album")
+		return
+	}
+	vals, err := s.pl.ListTag(tag)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
+		return
+	}
+	if vals == nil {
+		vals = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tag": tag, "items": vals})
+}
+
+// libraryFind answers GET /api/v1/library/find?tag=&value= with the songs
+// carrying that exact tag value.
+func (s *Server) libraryFind(w http.ResponseWriter, r *http.Request) {
+	tag, value := r.URL.Query().Get("tag"), r.URL.Query().Get("value")
+	if (tag != "artist" && tag != "album") || value == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "tag (artist|album) and value are required")
+		return
+	}
+	entries, err := s.pl.FindTag(tag, value)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
+		return
+	}
+	s.enrich(entries)
+	if entries == nil {
+		entries = []player.Entry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tag": tag, "value": value, "items": entries})
+}
