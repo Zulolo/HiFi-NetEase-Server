@@ -32,6 +32,14 @@
   .sig i { width:5px; background:#2a3138; border-radius:1px; }
   .sig i.on { background:var(--acc); }
   .sig i:nth-child(1){height:5px} .sig i:nth-child(2){height:8px} .sig i:nth-child(3){height:11px} .sig i:nth-child(4){height:14px}
+  .indcol { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+  .indcol .sig { margin-bottom:0; }
+  @media (max-width: 640px) {
+    .top { display:block; }
+    .top h1 { margin-bottom:10px; }
+    .sys { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .tile { width:auto; }
+  }
   .card { background:var(--card); border-radius:12px; padding:14px; margin-bottom:12px; }
   .title { font-size:19px; font-weight:600; margin-bottom:2px; word-break:break-word; }
   .sub { color:var(--mut); font-size:14px; }

@@ -645,7 +645,7 @@ const rateFixed = (bps) => { // always 8 chars: "  1.3 MB" / " 12  kB" style, un
   if (bps >= 1e3) return padL(Math.round(bps / 1e3) + " kB", 8);
   return padL(Math.round(bps) + " B", 8);
 };
-const fmtUp = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${padL(h, 2)}h` : `${padL(h, 2)}h ${padL(m, 2)}m`; };
+
 const tile = (cls, label, value, sub, ind) =>
   `<div class="tile ${cls}"><div class="l">${label}</div><div class="v">${value}</div><div class="s">${sub}</div><div class="ind">${ind}</div></div>`;
 
@@ -667,10 +667,8 @@ async function refreshSys() {
     tile(tempCls, "soc", padL((s.temp_c || 0).toFixed(0), 3) + " °C",
       (s.temp_zone || "").replace("-thermal", "").padEnd(12), spark(hist.temp, 30, 90)),
     tile("", "wi-fi ↓", rateFixed(s.net_rx_bps) + "/s",
-      `↑${rateFixed(s.net_tx_bps)}/s  ${padL(s.wifi_dbm || 0, 4)} dBm`, spark(hist.rx, 0, rxMax)),
-    tile("", "signal", padL(s.wifi_quality || 0, 3) + " q", `${padL(s.wifi_dbm || 0, 4)} dBm`, sig),
-    tile("", "hifid · mpd", padL(fmtBytes(s.hifid_rss), 7), `mpd ${padL(fmtBytes(s.mpd_rss), 7)}`, ""),
-    tile("", "uptime", fmtUp(s.uptime_sec), `${s.cpu_cores} cores`, ""),
+      `↑${rateFixed(s.net_tx_bps)}/s  ${padL(s.wifi_dbm || 0, 4)} dBm`,
+      `<div class="indcol">${sig}${spark(hist.rx, 0, rxMax)}</div>`),
   ].join("");
 }
 refreshSys();
