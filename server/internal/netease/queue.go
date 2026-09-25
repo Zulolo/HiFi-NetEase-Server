@@ -35,6 +35,11 @@ type Queue struct {
 	done    int
 	lastErr string
 	wake    chan struct{}
+
+	// paused stops the worker taking the next item and aborts the one in
+	// flight (it goes back to the head of the list). Persisted with the list.
+	paused    bool
+	curCancel context.CancelFunc
 }
 
 // Item is one queued download.
@@ -57,6 +62,7 @@ type QueueStatus struct {
 	TotalOnDisk int    `json:"total_on_disk"`
 	OnDiskBytes int64  `json:"on_disk_bytes"`
 	LastError   string `json:"last_error,omitempty"`
+	Paused      bool   `json:"paused"`
 }
 
 type queueFile struct {
@@ -66,6 +72,7 @@ type queueFile struct {
 	// put back at the head of the list on startup, so a restart or crash in
 	// the middle of a download never loses the track.
 	Current *Item `json:"current,omitempty"`
+	Paused  bool  `json:"paused,omitempty"`
 }
 
 const maxTries = 3
@@ -78,7 +85,7 @@ func NewQueue(c *Client, path string, pace time.Duration, log *slog.Logger) *Que
 	if b, err := os.ReadFile(path); err == nil {
 		var f queueFile
 		if json.Unmarshal(b, &f) == nil {
-			q.pending, q.failed = f.Pending, f.Failed
+			q.pending, q.failed, q.paused = f.Pending, f.Failed, f.Paused
 			if f.Current != nil {
 				q.pending = append([]Item{*f.Current}, q.pending...)
 			}
@@ -89,7 +96,7 @@ func NewQueue(c *Client, path string, pace time.Duration, log *slog.Logger) *Que
 
 // save must be called with the lock held.
 func (q *Queue) save() {
-	b, err := json.MarshalIndent(queueFile{Pending: q.pending, Failed: q.failed, Current: q.curItem}, "", " ")
+	b, err := json.MarshalIndent(queueFile{Pending: q.pending, Failed: q.failed, Current: q.curItem, Paused: q.paused}, "", " ")
 	if err != nil {
 		return
 	}
@@ -160,7 +167,35 @@ func (q *Queue) Status() QueueStatus {
 		TotalOnDisk: q.c.Downloaded(),
 		OnDiskBytes: q.c.DownloadedBytes(),
 		LastError:   q.lastErr,
+		Paused:      q.paused,
 	}
+}
+
+// SetPaused pauses or resumes the worker. Pausing aborts the download in
+// flight, which returns to the head of the list, so it takes effect at once;
+// the partial file is discarded and fetched again on resume.
+func (q *Queue) SetPaused(p bool) {
+	q.mu.Lock()
+	if q.paused == p {
+		q.mu.Unlock()
+		return
+	}
+	q.paused = p
+	if p && q.curCancel != nil {
+		q.curCancel()
+	}
+	q.save()
+	q.mu.Unlock()
+	if !p {
+		q.nudge()
+	}
+}
+
+// Paused reports whether the worker is paused.
+func (q *Queue) Paused() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.paused
 }
 
 // Pending reports how many downloads are waiting, for callers that only need
@@ -191,21 +226,32 @@ func (q *Queue) Run(ctx context.Context) {
 		q.current = it.Artist + " — " + it.Title
 		cur := it
 		q.curItem, q.curDone, q.curSize = &cur, 0, 0
+		dlCtx, cancel := context.WithCancel(ctx)
+		q.curCancel = cancel
 		q.save() // the in-flight item is now on disk too
 		q.mu.Unlock()
 
-		rel, err := q.c.DownloadWithProgress(ctx, it.ID, func(done, total int64) {
+		rel, err := q.c.DownloadWithProgress(dlCtx, it.ID, func(done, total int64) {
 			q.mu.Lock()
 			q.curDone, q.curSize = done, total
 			q.mu.Unlock()
 		})
 
+		cancel()
 		q.mu.Lock()
-		if err != nil && ctx.Err() != nil {
-			// shutting down: leave it recorded as Current so the next start
-			// puts it back at the head of the list
+		q.curCancel = nil
+		if err != nil && dlCtx.Err() != nil {
+			// interrupted by shutdown or pause: back to the head of the list
+			// so nothing is lost and it is retried first
+			q.pending = append([]Item{it}, q.pending...)
+			q.current = ""
+			q.curItem, q.curDone, q.curSize = nil, 0, 0
+			q.save()
 			q.mu.Unlock()
-			return
+			if ctx.Err() != nil {
+				return
+			}
+			continue
 		}
 		q.current = ""
 		q.curItem, q.curDone, q.curSize = nil, 0, 0
@@ -247,7 +293,7 @@ func (q *Queue) Run(ctx context.Context) {
 func (q *Queue) next() (Item, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for len(q.pending) > 0 {
+	for !q.paused && len(q.pending) > 0 {
 		it := q.pending[0]
 		q.pending = q.pending[1:]
 		if _, ok := q.c.LocalPath(it.ID); ok {

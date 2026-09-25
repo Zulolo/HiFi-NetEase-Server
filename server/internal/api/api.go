@@ -119,6 +119,8 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("POST /api/v1/netease/download/playlist", g(s.ncmDownloadPlaylist))
 	m.HandleFunc("GET /api/v1/netease/downloads", g(s.ncmDownloads))
 	m.HandleFunc("DELETE /api/v1/netease/downloads", g(s.ncmDownloadsClear))
+	m.HandleFunc("POST /api/v1/netease/downloads/pause", g(s.ncmDownloadsPause))
+	m.HandleFunc("POST /api/v1/netease/downloads/resume", g(s.ncmDownloadsResume))
 
 	// MPD fetches this; it is loopback-only and carries no token (docs/08 §5).
 	m.HandleFunc("GET /stream/ncm/{id}", s.ncmStream)

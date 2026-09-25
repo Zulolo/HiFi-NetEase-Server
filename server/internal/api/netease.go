@@ -237,3 +237,21 @@ func (s *Server) ncmSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"query": q, "items": tracks, "total": total})
 }
+
+// ncmDownloadsPause / ncmDownloadsResume toggle the download worker. Pause
+// aborts the transfer in flight; it is retried first on resume.
+func (s *Server) ncmDownloadsPause(w http.ResponseWriter, r *http.Request) {
+	if !s.dlReady(w) {
+		return
+	}
+	s.dl.SetPaused(true)
+	writeJSON(w, http.StatusOK, s.dl.Status())
+}
+
+func (s *Server) ncmDownloadsResume(w http.ResponseWriter, r *http.Request) {
+	if !s.dlReady(w) {
+		return
+	}
+	s.dl.SetPaused(false)
+	writeJSON(w, http.StatusOK, s.dl.Status())
+}

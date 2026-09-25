@@ -511,6 +511,7 @@ const dlPanel = $("dl-panel");
 const dlNow = $("dl-now");
 const dlProg = $("dl-prog");
 const dlPct = $("dl-pct");
+const dlPause = $("dl-pause");
 let dlTimer = null;
 
 function renderDlPanel(s) {
@@ -524,10 +525,12 @@ function renderDlPanel(s) {
       ? `${fmtBytes(s.current_bytes)} of ${fmtBytes(s.current_size)} (${pct.toFixed(0)}%)`
       : fmtBytes(s.current_bytes || 0);
   } else {
-    dlNow.textContent = "Nothing downloading.";
+    dlNow.textContent = s.paused ? "Paused." : "Nothing downloading.";
     dlProg.style.width = "0";
     dlPct.textContent = "";
   }
+  dlPause.textContent = s.paused ? "▶ Resume" : "⏸ Pause";
+  dlPause.classList.toggle("busy", !!s.paused);
   bList.innerHTML = "";
   const add = (label, it, cls) => {
     const li = document.createElement("li");
@@ -537,7 +540,7 @@ function renderDlPanel(s) {
   (s.pending || []).forEach((it) => add("queued", it));
   (s.failed || []).forEach((it) => add("failed" + (it.tries ? " x" + it.tries : ""), it, "err"));
   const nPend = (s.pending || []).length, nFail = (s.failed || []).length;
-  setStatus(`${s.done} finished this session · ${nPend} queued · ${nFail} failed · ${s.total_on_disk} on disk (${fmtBytes(s.on_disk_bytes || 0)})`);
+  setStatus(`${s.paused ? "PAUSED · " : ""}${s.done} finished this session · ${nPend} queued · ${nFail} failed · ${s.total_on_disk} on disk (${fmtBytes(s.on_disk_bytes || 0)})`);
 }
 
 async function showDownloads() {
@@ -551,6 +554,10 @@ async function showDownloads() {
   }, 2000);
 }
 $("dl-clear").onclick = async () => renderDlPanel(await call("/netease/downloads", "DELETE"));
+dlPause.onclick = async () => {
+  const paused = dlPause.classList.contains("busy");
+  renderDlPanel(await call(paused ? "/netease/downloads/resume" : "/netease/downloads/pause", "POST"));
+};
 tabDl.onclick = () => setMode("dl");
 
 // ---- now-playing marker in lists ------------------------------------------------

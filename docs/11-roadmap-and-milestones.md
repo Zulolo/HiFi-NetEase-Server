@@ -102,6 +102,12 @@ same row type as playlist tracks: tap to play live at lossless, arrow to add to 
 list, `on_disk` when a copy already exists. The PWA shows the search box on the NetEase tab,
 debounced 400 ms, 50 results per page.
 
+The download list gained pause/resume the same day: the flag is persisted with the list, so
+a paused board stays paused across reboots; pausing cancels the transfer in flight (partial
+file discarded) and puts that track back at the head, and Clear list still drops everything
+waiting. Bulk adds are safe to repeat, since tracks on disk are skipped at add time and again
+just before fetch.
+
 Still open in M2, none of it blocking daily use: daily recommendations, cloud disk, and
 playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
 pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
