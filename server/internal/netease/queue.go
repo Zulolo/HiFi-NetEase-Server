@@ -31,6 +31,7 @@ type Queue struct {
 	curItem *Item
 	curDone int64
 	curSize int64
+	lastDone *Item
 	done    int
 	lastErr string
 	wake    chan struct{}
@@ -51,6 +52,7 @@ type QueueStatus struct {
 	CurrentItem *Item  `json:"current_item,omitempty"`
 	CurrentDone int64  `json:"current_bytes"`
 	CurrentSize int64  `json:"current_size"`
+	LastDone    *Item  `json:"last_done,omitempty"`
 	Done        int    `json:"done"`
 	TotalOnDisk int    `json:"total_on_disk"`
 	OnDiskBytes int64  `json:"on_disk_bytes"`
@@ -60,6 +62,10 @@ type QueueStatus struct {
 type queueFile struct {
 	Pending []Item `json:"pending"`
 	Failed  []Item `json:"failed"`
+	// Current is the item being downloaded when the file was written. It is
+	// put back at the head of the list on startup, so a restart or crash in
+	// the middle of a download never loses the track.
+	Current *Item `json:"current,omitempty"`
 }
 
 const maxTries = 3
@@ -73,6 +79,9 @@ func NewQueue(c *Client, path string, pace time.Duration, log *slog.Logger) *Que
 		var f queueFile
 		if json.Unmarshal(b, &f) == nil {
 			q.pending, q.failed = f.Pending, f.Failed
+			if f.Current != nil {
+				q.pending = append([]Item{*f.Current}, q.pending...)
+			}
 		}
 	}
 	return q
@@ -80,7 +89,7 @@ func NewQueue(c *Client, path string, pace time.Duration, log *slog.Logger) *Que
 
 // save must be called with the lock held.
 func (q *Queue) save() {
-	b, err := json.MarshalIndent(queueFile{Pending: q.pending, Failed: q.failed}, "", " ")
+	b, err := json.MarshalIndent(queueFile{Pending: q.pending, Failed: q.failed, Current: q.curItem}, "", " ")
 	if err != nil {
 		return
 	}
@@ -107,7 +116,7 @@ func (q *Queue) Add(items ...Item) int {
 		if _, ok := q.c.LocalPath(it.ID); ok {
 			continue
 		}
-		dup := false
+		dup := q.curItem != nil && q.curItem.ID == it.ID
 		for _, p := range q.pending {
 			if p.ID == it.ID {
 				dup = true
@@ -146,6 +155,7 @@ func (q *Queue) Status() QueueStatus {
 		CurrentItem: q.curItem,
 		CurrentDone: q.curDone,
 		CurrentSize: q.curSize,
+		LastDone:    q.lastDone,
 		Done:        q.done,
 		TotalOnDisk: q.c.Downloaded(),
 		OnDiskBytes: q.c.DownloadedBytes(),
@@ -181,6 +191,7 @@ func (q *Queue) Run(ctx context.Context) {
 		q.current = it.Artist + " — " + it.Title
 		cur := it
 		q.curItem, q.curDone, q.curSize = &cur, 0, 0
+		q.save() // the in-flight item is now on disk too
 		q.mu.Unlock()
 
 		rel, err := q.c.DownloadWithProgress(ctx, it.ID, func(done, total int64) {
@@ -190,16 +201,15 @@ func (q *Queue) Run(ctx context.Context) {
 		})
 
 		q.mu.Lock()
+		if err != nil && ctx.Err() != nil {
+			// shutting down: leave it recorded as Current so the next start
+			// puts it back at the head of the list
+			q.mu.Unlock()
+			return
+		}
 		q.current = ""
 		q.curItem, q.curDone, q.curSize = nil, 0, 0
 		if err != nil {
-			if ctx.Err() != nil {
-				// shutting down: put it back untouched
-				q.pending = append([]Item{it}, q.pending...)
-				q.save()
-				q.mu.Unlock()
-				return
-			}
 			it.Tries++
 			q.lastErr = err.Error()
 			if it.Tries >= maxTries {
@@ -212,6 +222,8 @@ func (q *Queue) Run(ctx context.Context) {
 			}
 		} else {
 			q.done++
+			doneItem := it
+			q.lastDone = &doneItem
 			if q.log != nil {
 				q.log.Info("downloaded", "song", it.ID, "title", it.Title, "path", rel)
 			}

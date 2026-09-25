@@ -92,8 +92,17 @@ func main() {
 			}
 			srv.SetQueue(dlq)
 			dlCtx, stopDL := context.WithCancel(context.Background())
-			defer stopDL()
-			go dlq.Run(dlCtx)
+			dlDone := make(chan struct{})
+			go func() { dlq.Run(dlCtx); close(dlDone) }()
+			// On shutdown, give the worker a moment to record the in-flight
+			// download before the process exits; otherwise it could be lost.
+			defer func() {
+				stopDL()
+				select {
+				case <-dlDone:
+				case <-time.After(5 * time.Second):
+				}
+			}()
 			if p, err := ncm.Profile(context.Background()); err != nil {
 				log.Warn("netease session not usable yet", "err", err)
 			} else {

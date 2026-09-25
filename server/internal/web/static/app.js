@@ -205,17 +205,17 @@ async function showTracks(id, name) {
     li.appendChild(txt);
 
     const dl = document.createElement("button");
-    const queued = queuedIDs.has(t.id);
-    dl.className = "act" + (t.on_disk ? " done" : "");
-    dl.textContent = t.on_disk ? "✓" : queued ? "⋯" : "↓";
-    dl.title = t.on_disk ? "on disk" : queued ? "in the download list" : "add to the download list";
+    dl.className = "act dlbtn";
+    dl.dataset.ncm = t.id;
+    if (t.on_disk) dl.dataset.state = "done";
+    paintDlButton(dl);
     dl.onclick = async (e) => {
       e.stopPropagation();
-      if (t.on_disk) return;
+      if (dl.dataset.state === "done") return;
       dl.textContent = "…";
       const r = await call("/netease/download", "POST", { ref: t.ref });
-      dl.textContent = r && r.on_disk ? "✓" : "⋯";
-      refreshDownloads();
+      if (r && r.on_disk) dl.dataset.state = "done";
+      await refreshDownloads(); // repaints this button from the server's view
     };
     li.appendChild(dl);
     li.dataset.ncm = t.id;
@@ -252,9 +252,14 @@ const dlBtn = $("dl-playlist");
 let viewingPlaylist = null;
 let queuedIDs = new Set();
 
+let currentDlID = 0, lastDoneID = 0, failedIDs = new Set();
 function renderDownloads(s) {
   if (!s) { dlLine.textContent = ""; return; }
   queuedIDs = new Set((s.pending || []).map((i) => i.id));
+  failedIDs = new Set((s.failed || []).map((i) => i.id));
+  currentDlID = s.current_item ? s.current_item.id : 0;
+  lastDoneID = s.last_done ? s.last_done.id : 0;
+  updateRowButtons();
   const bits = [`${s.total_on_disk} on disk` + (s.on_disk_bytes ? ` (${fmtBytes(s.on_disk_bytes)})` : "")];
   if (s.current) bits.push(`downloading: ${s.current}`);
   if (s.pending && s.pending.length) bits.push(`${s.pending.length} queued`);
@@ -273,7 +278,7 @@ dlBtn.onclick = async () => {
   dlBtn.textContent = "…";
   const r = await call("/netease/download/playlist", "POST", { playlist_id: viewingPlaylist });
   dlBtn.textContent = label;
-  if (r) { await refreshDownloads(); if (typeof reloadTracks === "function") reloadTracks(); }
+  if (r) await refreshDownloads();
 };
 
 refreshDownloads();
@@ -567,4 +572,33 @@ function markPlaying(st) {
   const key = hit ? (id || path) : "";
   if (hit && key !== lastPlayingKey) hit.scrollIntoView({ block: "nearest" });
   lastPlayingKey = key;
+}
+
+// ---- download button states, painted from the server's list --------------------
+// done: on disk · downloading: in flight · queued: waiting · failed: gave up · idle
+function dlStateFor(id, btn) {
+  if (btn.dataset.state === "done" || id === lastDoneID) return "done";
+  if (id === currentDlID) return "downloading";
+  if (queuedIDs.has(id)) return "queued";
+  if (failedIDs.has(id)) return "failed";
+  // it was in the list a moment ago and is in no list now: it finished
+  if (btn.dataset.state === "downloading" || btn.dataset.state === "queued") return "done";
+  return "idle";
+}
+const DL_GLYPH = { done: "✓", downloading: "⬇", queued: "⋯", failed: "!", idle: "↓" };
+const DL_TITLE = {
+  done: "on disk", downloading: "downloading now", queued: "in the download list",
+  failed: "download failed", idle: "add to the download list",
+};
+function paintDlButton(btn) {
+  const id = Number(btn.dataset.ncm);
+  const st = dlStateFor(id, btn);
+  btn.dataset.state = st;
+  btn.textContent = DL_GLYPH[st];
+  btn.title = DL_TITLE[st];
+  btn.classList.toggle("done", st === "done");
+  btn.classList.toggle("busy", st === "downloading");
+}
+function updateRowButtons() {
+  document.querySelectorAll("button.dlbtn").forEach(paintDlButton);
 }
