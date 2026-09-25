@@ -88,7 +88,37 @@ Result on the tested dongle (Comtrue bridge, ES9039, `2fc6:f802`, kernel 6.1): P
 
 ## 5. Control from the phone
 
-Two ways; both talk to the same MPD, so you can mix them.
+Three ways; all talk to the same MPD, so you can mix them. The hifid app is the one to use
+day to day: it is the only one that knows about NetEase.
+
+### 5.0 The hifid app (NetEase, downloads, local files)
+
+Open `http://<hostname>.local/` (port 80) on the phone and use the browser's "Add to Home
+screen" to pin it. No login is needed on the phone; the first visit may ask for the token
+printed by the installer if you set auth to `token`.
+
+- **Now playing** shows the delivered format (for example "PCM 24/192k · S24_LE", or a DSD
+  rate for native DSD). Tap the progress bar to seek. Repeat and Shuffle sit under the
+  transport row. Volume has a slider plus − / + for 1 % steps.
+- **NetEase tab**: your playlists, ★ liked songs, and a "Daily picks" row (每日推荐). Tap a
+  playlist to open it, ▶ on a row plays the whole list. Inside a list, tap a track to play
+  from there; the arrow on the right adds it to the download list; a green tick means a copy
+  is already on disk. The search box above the list searches the whole NetEase catalogue.
+- **Play policy**: a track plays from the local copy when one exists, otherwise it streams
+  live at lossless (无损). Playing or liking never downloads anything. Only tracks or lists
+  you add to the download list are fetched, at the best level your account grants (超清母带
+  when available), tagged, and filed under "NetEase downloads".
+- **Downloads tab**: progress of the current file, what is queued, what failed. Pause holds
+  the list (the file in flight is dropped and retried first on Resume); Clear list forgets
+  everything waiting. Downloaded files are never deleted by the server.
+- **Library tab**: "Uploads" is the Samba share, "NetEase downloads" the fetched tracks.
+  Tap a folder to browse, a track to play from there; the header shows songs, size and free
+  space.
+- **Header strip**: CPU, RAM, SoC temperature and Wi-Fi throughput/signal, refreshed every
+  3 s. The ⏻ button next to the name powers the board off after a confirmation. Wait for the
+  LED to go out before unplugging; to start it again, unplug and replug power.
+
+
 
 ### 5.1 Browser, no app (myMPD)
 

@@ -113,8 +113,12 @@ the `hifid` user, confirm dialog), tap-to-seek on the progress bar, and repeat/s
 toggles under the transport row (the API had seek and options since M1; only the PWA lacked
 them). Cloud disk (云盘) is dropped: the owner does not use it.
 
-Still open in M2, none of it blocking daily use: daily recommendations, album/artist pages
-from a search result, and playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
+Daily recommendations (每日推荐) landed the same day: `GET /netease/daily` wraps the library's
+`RecommendSongs`; the PWA shows a "Daily picks" row at the top of the NetEase tab with its own
+play-all, and the page reuses the search-result renderer (play from here, download, on-disk).
+
+Still open in M2, none of it blocking daily use: album/artist pages from a search result, and
+playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
 pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.

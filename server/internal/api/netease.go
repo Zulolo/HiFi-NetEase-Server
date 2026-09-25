@@ -255,3 +255,19 @@ func (s *Server) ncmDownloadsResume(w http.ResponseWriter, r *http.Request) {
 	s.dl.SetPaused(false)
 	writeJSON(w, http.StatusOK, s.dl.Status())
 }
+
+// ncmDaily answers GET /api/v1/netease/daily with today's recommendations.
+func (s *Server) ncmDaily(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	tracks, err := s.ncm.Daily(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	if tracks == nil {
+		tracks = []netease.Track{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": tracks, "total": len(tracks)})
+}

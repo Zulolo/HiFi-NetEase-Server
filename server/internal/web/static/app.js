@@ -180,6 +180,25 @@ async function showPlaylists() {
   }
   hideLoginPanel();
   setStatus(`${r.items.length} playlists`);
+  {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="ico">📅</div><div class="txt"><div class="n">Daily picks</div><div class="s">每日推荐 · today's 30 for you</div></div>`;
+    li.onclick = () => showDaily();
+    const play = document.createElement("button");
+    play.className = "act";
+    play.textContent = "▶";
+    play.title = "play today's picks";
+    play.onclick = async (e) => {
+      e.stopPropagation();
+      play.textContent = "…";
+      const d = await call("/netease/daily", "GET");
+      const st = d && d.items && d.items.length ? await call("/queue", "POST", { items: d.items.map(trackItem), mode: "replace", play: true }) : null;
+      play.textContent = "▶";
+      if (st) render(st);
+    };
+    li.appendChild(play);
+    bList.appendChild(li);
+  }
   r.items.forEach((p) => {
     const li = document.createElement("li");
     li.innerHTML = `${img(p.cover)}<div class="txt"><div class="n">${p.liked ? "★ " : ""}${p.name}</div><div class="s">${p.track_count} tracks</div></div>`;
@@ -753,6 +772,23 @@ function renderTrackRows(items, statusText) {
     bList.appendChild(li);
   });
   refresh();
+}
+
+const trackItem = (x) => ({ ref: x.ref, title: x.title, artist: x.artist, album: x.album });
+
+async function showDaily() {
+  viewingPlaylist = null;
+  reloadTracks = () => showDaily();
+  refreshDownloads();
+  bTitle.textContent = "Daily picks";
+  bBack.hidden = false;
+  bBack.onclick = () => showPlaylists();
+  setStatus("loading today's picks…");
+  bList.innerHTML = "";
+  const res = await call("/netease/daily", "GET");
+  if (!res || !res.items) { setStatus("could not load daily picks"); return; }
+  renderTrackRows(res.items, `${res.items.length} picks for today`);
+  setPlayAll(async () => call("/queue", "POST", { items: res.items.map(trackItem), mode: "replace", play: true }));
 }
 
 async function runNcmSearch(q) {

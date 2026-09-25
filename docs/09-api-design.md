@@ -124,7 +124,7 @@ POST /netease/login/cookie           {"music_u":"…"}
 POST /netease/logout
 GET  /netease/me/playlists           -> [ {"id":456,"name":"…","count":120,"cover":"…","special":"liked|null"} ]
 GET  /netease/me/liked?offset&limit  -> Song[]
-GET  /netease/recommend/daily        -> Song[]
+GET  /netease/daily                  -> {"items":Track[],"total":30}   // 每日推荐, implemented 2026-09-25
 GET  /netease/playlist/{id}?offset&limit
 GET  /netease/album/{id}
 GET  /netease/artist/{id}/songs?offset&limit
