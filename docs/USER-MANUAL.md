@@ -94,9 +94,9 @@ Two ways; both talk to the same MPD, so you can mix them.
 
 Install the web client on the board with `sudo ./install.sh ... --with-mympd` (or later:
 the same steps are in `install.sh` §6; Debian 12/13 on arm64/amd64, other architectures
-build it from source). Then open `http://<board-ip>/` on the phone. Library, queue,
+build it from source). Then open `http://<board-ip>:8080/` on the phone (the bare `http://<board-ip>/` is the hifid app with NetEase). Library, queue,
 transport, volume, playlists, **Outputs**, web radio and smart playlists are all there. To
-pin it as an app icon with full-screen behaviour, open `https://<board-ip>/` once, accept
+pin it as an app icon with full-screen behaviour, open `https://<board-ip>:8443/` once, accept
 the self-signed certificate, and use the browser's "Add to Home screen".
 
 **Queue vs. library.** MPD keeps two lists: the *library* (everything on the disk, indexed

@@ -48,7 +48,7 @@ to the ES9039 dongle as bit-perfect `S24_3LE @ 192000 Hz` at 0.6 % CPU.
 Steps 2 and 3 result: `hifid` v0.1.0-m1 is built and deployed as a managed systemd service
 (`deploy/scripts/install-hifid.sh`). It runs as an unprivileged `hifid` user at ~8 MB RSS,
 reaches MPD over `/run/mpd/socket` even under `ProtectSystem=strict`, serves the REST +
-WebSocket API and the embedded PWA on port 8080, and comes back by itself after a reboot
+WebSocket API and the embedded PWA on port 80 (8080 until 2026-09-25; myMPD moved to 8080/8443), and comes back by itself after a reboot
 (boot to ready unchanged at 25 s, NFR-2). `format.delivery` is cross-checked against
 `/proc/asound/.../hw_params`: a DSD256 file reports `native-dsd, 11289600, DSD_U32_BE @
 352800`, matching the kernel exactly (FR-4.6). go-musicfox was not needed: `ncmctl` covered

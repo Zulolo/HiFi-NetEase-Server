@@ -55,7 +55,7 @@ type MPD struct {
 func Default() *Config {
 	return &Config{
 		ServerName: "HiFi Server",
-		Listen:     "0.0.0.0:8080",
+		Listen:     "0.0.0.0:80",
 		Auth:       Auth{Mode: "admin"},
 		Paths: Paths{
 			Music:    "/srv/music",

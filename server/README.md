@@ -55,7 +55,7 @@ GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 go build -o dist/hifid-riscv64 ./cmd/hif
 
 ```sh
 hifid --config /etc/hifid/config.yaml            # defaults work without the file
-hifid --listen 0.0.0.0:8080                      # override the listen address
+hifid --listen 0.0.0.0:80                        # override the listen address
 ```
 
 `HIFID_TOKEN` supplies the bearer token; `auth.mode: all` then requires it on

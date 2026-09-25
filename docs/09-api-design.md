@@ -2,7 +2,7 @@
 
 Status: draft v0.1 · 2026-09-13 · addresses FR-2, FR-3, FR-5, NFR-5, NFR-7
 
-One HTTP server on port 8080 (configurable) serves:
+One HTTP server on port 80 (configurable; moved from 8080 on 2026-09-25 so the bare hostname opens the app) serves:
 
 | Prefix | Purpose |
 |--------|---------|
@@ -221,10 +221,10 @@ Server pushes `{"type":"…","ts":…,"data":{…}}`; client may send `{"type":"
 
 ## 12. Discovery (FR-2.6)
 
-- DNS-SD service `_hifid._tcp.local.` port 8080, TXT: `v=1`, `api=/api/v1`, `name=<server_name>`,
+- DNS-SD service `_hifid._tcp.local.` port 80, TXT: `v=1`, `api=/api/v1`, `name=<server_name>`,
   `id=<machine id prefix>`. Also `_http._tcp` so generic browsers list it.
-- UDP fallback: broadcast `HIFID-DISCOVER` to port 8081 → reply `{"name":…,"url":"http://<ip>:8080"}`.
-- The PWA cannot browse mDNS; it relies on the user opening `http://<hostname>.local:8080` once,
+- UDP fallback: broadcast `HIFID-DISCOVER` to port 8081 → reply `{"name":…,"url":"http://<ip>"}`.
+- The PWA cannot browse mDNS; it relies on the user opening `http://<hostname>.local` once,
   then remembers the URL. A native app uses Android NSD.
 
 ## 13. Versioning and compatibility

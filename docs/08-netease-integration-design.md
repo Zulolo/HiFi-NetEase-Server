@@ -126,7 +126,7 @@ MPD's queue must never hold raw CDN URLs (C-2: they expire in minutes and are bo
 session). Instead every NetEase track is enqueued as
 
 ```
-http://127.0.0.1:8080/stream/ncm/<songID>
+http://127.0.0.1:80/stream/ncm/<songID>
 ```
 
 Behaviour of `GET /stream/ncm/{id}`:
@@ -186,7 +186,7 @@ playlists on login, on demand, and every 6 hours:
 <music>/playlists/NetEase/<playlist name>.m3u
 #EXTM3U
 #EXTINF:243,Artist - Title
-http://127.0.0.1:8080/stream/ncm/123456
+http://127.0.0.1:80/stream/ncm/123456
 ```
 
 MPD's `extm3u` playlist plugin reads `#EXTINF` (duration and display title), so M.A.L.P.,

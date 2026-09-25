@@ -12,7 +12,7 @@
 #   4. gen-mpd-conf.sh /etc/mpd.conf with one output per DAC, bit-perfect settings
 #   5. samba share on /srv/music/local, avahi advertisement, optional Wi-Fi watchdog
 #   6. optional myMPD web client (--with-mympd; Debian 12/13 on amd64/arm64 via the upstream OBS repo),
-#      served on http://board/ (port 80) and https://board/ (443) so phones need no app
+#      served on http://board:8080/ and https://board:8443/ (port 80 belongs to the hifid phone app)
 #   7. enable services and print how to connect from the phone
 #
 # Tested: Orange Pi Zero 3 (Debian 12, kernel 6.1) with a Comtrue/ES9039 dongle. Should work on
@@ -114,7 +114,7 @@ if [ $MYMPD -eq 1 ]; then
     mkdir -p /var/lib/mympd/config
     printf '/run/mpd/socket' > /var/lib/mympd/config/mpd_host
     printf '%s' "$MUSIC_DIR" > /var/lib/mympd/config/mpd_music_directory
-    printf 80 > /var/lib/mympd/config/http_port; printf 443 > /var/lib/mympd/config/ssl_port   # 8080 is reserved for hifid
+    printf 8080 > /var/lib/mympd/config/http_port; printf 8443 > /var/lib/mympd/config/ssl_port   # 80 belongs to hifid
     chown -R mympd:mympd /var/lib/mympd 2>/dev/null || true
     systemctl enable --now mympd >/dev/null 2>&1 && log "myMPD $(mympd --version 2>/dev/null | awk '{print $2}') on http://$(hostname -I | awk '{print $1}')/"
   fi

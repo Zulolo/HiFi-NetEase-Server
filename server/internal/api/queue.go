@@ -111,7 +111,7 @@ func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
 func (s *Server) streamURL(id int64) string {
 	_, port, err := net_SplitHostPort(s.cfg.Listen)
 	if err != nil || port == "" {
-		port = "8080"
+		port = "80"
 	}
 	return "http://127.0.0.1:" + port + "/stream/ncm/" + strconv.FormatInt(id, 10)
 }

@@ -25,7 +25,7 @@ confirm the router does not enable AP/client isolation (it blocks mDNS and Samba
 4. udev: copy deploy/udev/90-hifi-dac.rules ; udevadm control --reload ; replug dongles ; check /proc/asound/cards
 5. MPD: copy deploy/mpd/mpd.conf.example -> /etc/mpd.conf (hifid regenerates it later) ; drop-in deploy/systemd/mpd.service.d/override.conf
 6. hifid: build it (`cd server && go build -o dist/hifid ./cmd/hifid`), then `sudo deploy/scripts/install-hifid.sh --binary server/dist/hifid` — it creates the `hifid` system user, `/etc/hifid/config.yaml`, a generated token in `/etc/hifid/env` (0640 root:hifid), installs the binary and enables `hifid.service`. Re-running keeps an existing config and token.
-7. Verify: mpc outputs ; curl http://hifi.local:8080/api/v1/system/status ; open http://hifi.local:8080 on the phone
+7. Verify: mpc outputs ; curl http://hifi.local/api/v1/system/status ; open http://hifi.local on the phone
 ```
 
 Users and groups: `mpd` (Debian default) and `hifid` (system user) both in `audio`; `hifid`
@@ -46,7 +46,7 @@ can write `/etc/mpd.conf` through a small `sudoers` rule limited to `install -m 
 | `avahi-daemon` | `/etc/avahi/services/hifid.service` publishes `_hifid._tcp` and `_http._tcp` |
 
 MPD socket: MPD listens on `/run/mpd/socket` (for `hifid`, fast) and on the LAN IP port 6600
-(for M.A.L.P.). `hifid` listens on `0.0.0.0:8080` by default but can be pinned to the LAN
+(for M.A.L.P.). `hifid` listens on `0.0.0.0:80` by default but can be pinned to the LAN
 interface; the stream proxy listens on `127.0.0.1` only.
 
 ## 4. Configuration files
@@ -55,7 +55,7 @@ interface; the stream proxy listens on `127.0.0.1` only.
 
 ```yaml
 server_name: Living room
-listen: 0.0.0.0:8080
+listen: 0.0.0.0:80
 auth: { mode: admin }                     # none | admin | all ; token in /etc/hifid/env
 paths:
   music: /srv/music

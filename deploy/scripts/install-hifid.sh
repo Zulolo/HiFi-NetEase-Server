@@ -1,7 +1,7 @@
 #!/bin/bash
 # install-hifid.sh — install the hifid control service as a managed systemd unit.
 #
-#   sudo ./install-hifid.sh --binary /path/to/hifid [--listen 0.0.0.0:8080]
+#   sudo ./install-hifid.sh --binary /path/to/hifid [--listen 0.0.0.0:80]
 #                           [--auth admin|none|all] [--unit /path/to/hifid.service]
 #
 # Creates the hifid system user, /etc/hifid/{config.yaml,env}, installs the binary to
@@ -9,7 +9,7 @@
 # config and token are kept, only the binary and unit are refreshed.
 set -euo pipefail
 
-BIN=""; LISTEN="0.0.0.0:8080"; AUTH="admin"; UNIT=""
+BIN=""; LISTEN="0.0.0.0:80"; AUTH="admin"; UNIT=""
 here=$(cd "$(dirname "$0")" && pwd)
 
 while [ $# -gt 0 ]; do
@@ -95,4 +95,4 @@ systemctl --no-pager --lines=0 status hifid.service || true
 echo
 echo "hifid is installed. Token for API clients:"
 echo "  sudo sed -n 's/^HIFID_TOKEN=//p' /etc/hifid/env"
-echo "Open the phone UI at: http://$(hostname).local:${LISTEN##*:}"
+port=${LISTEN##*:}; if [ "$port" = 80 ]; then echo "Open the phone UI at: http://$(hostname).local/"; else echo "Open the phone UI at: http://$(hostname).local:$port/"; fi

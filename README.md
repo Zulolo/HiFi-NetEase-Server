@@ -8,7 +8,7 @@ input, controlled from a phone on the LAN, with music imported from a PC over th
 **Status: NetEase integration working (milestones M0–M2 core done).** `deploy/scripts/install.sh`
 turns a fresh Debian board into a bit-perfect MPD server with DAC auto-detection (including
 native DSD where the kernel allows it) and a Samba share; `deploy/scripts/install-hifid.sh`
-adds the `hifid` service and its phone web app on port 8080. From the phone you can log in to
+adds the `hifid` service and its phone web app at the bare hostname (port 80; myMPD, if installed, sits on 8080). From the phone you can log in to
 NetEase by QR code, browse your playlists, play a track live (streamed at lossless) or add it
 to an explicit download list (fetched at the best quality your account grants, then played
 from disk), and browse everything already on the disk, uploads included. Start with the

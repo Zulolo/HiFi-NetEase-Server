@@ -67,7 +67,7 @@ DSD settings. That is exactly the scope of the `hifid` PWA.
 Browsers cannot browse mDNS, so the PWA is reached by URL. Three aids:
 
 1. Avahi publishes the host as `hifi.local`; Android 13+ and iOS resolve `.local` names
-   system-wide, so `http://hifi.local:8080` works on most phones.
+   system-wide, so `http://hifi.local` works on most phones.
 2. The server prints a QR code with its URL on the status page and in the install script.
 3. Fallback: the router's DHCP client list or a fixed DHCP lease.
 

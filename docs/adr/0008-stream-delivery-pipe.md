@@ -7,7 +7,7 @@
 ## Context
 
 `hifid` enqueues every NetEase track into MPD as a local proxy URL
-(`http://127.0.0.1:8080/stream/ncm/<songID>`) because raw CDN URLs expire and are bound to the
+(`http://127.0.0.1:80/stream/ncm/<songID>`) because raw CDN URLs expire and are bound to the
 session (C-2). The original design left two ways for that endpoint to deliver audio, and chose
 the cheaper one as the default:
 
