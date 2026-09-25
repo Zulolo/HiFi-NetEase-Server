@@ -339,6 +339,16 @@ func (c *Client) resolve(ctx context.Context, id int64, ladder []types.Level, us
 			lastErr = fmt.Errorf("level %s unavailable (code %d)", level, d.Code)
 			continue
 		}
+		// NetEase may answer a request for one level with a *different* one.
+		// A lower stereo level is the documented graceful downgrade and is
+		// accepted. An effect variant (sky, jyeffect, dolby, vivid) is not:
+		// it is a DSP-processed surround mix, excluded by docs/08 §4, and
+		// showed up as a 16/44 "sky" FLAC where the real stereo release was a
+		// 320 kbps MP3. Skip it and let the next rung ask for that release.
+		if !stereoLevel(d.Level) {
+			lastErr = fmt.Errorf("level %s answered with excluded variant %q", level, d.Level)
+			continue
+		}
 		res := Resolved{
 			ID:         d.Id,
 			URL:        d.Url,
@@ -416,4 +426,15 @@ func ParseRef(ref string) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// stereoLevel reports whether a granted level is a plain stereo release rather
+// than one of NetEase's processed effect variants.
+func stereoLevel(level string) bool {
+	switch types.Level(level) {
+	case types.LevelStandard, types.LevelHigher, types.LevelExhigh,
+		types.LevelLossless, types.LevelHires, types.LevelJymaster:
+		return true
+	}
+	return false
 }
