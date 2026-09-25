@@ -44,6 +44,8 @@ func (s *Server) addQueue(w http.ResponseWriter, r *http.Request) {
 			err error
 		)
 		switch {
+		case strings.HasPrefix(ref, "ncm:playlist:"):
+			qid, err = s.addNCMPlaylist(r, strings.TrimPrefix(ref, "ncm:playlist:"))
 		case strings.HasPrefix(ref, "ncm:"):
 			qid, err = s.addNCM(r, ref)
 		case strings.HasPrefix(ref, "local:"):
@@ -132,4 +134,59 @@ func topSegment(rel string) string {
 		return rel[:i]
 	}
 	return rel
+}
+
+// addNCMPlaylist enqueues every track of a playlist in its own order and
+// returns the queue id of the first one. Metadata comes from the batched track
+// listing, so a 1,000-track playlist costs a handful of API calls rather than
+// one lookup per song. Adding is local MPD work; URLs are only resolved when a
+// track actually starts playing.
+func (s *Server) addNCMPlaylist(r *http.Request, idText string) (int, error) {
+	if s.ncm == nil {
+		return 0, fmt.Errorf("NetEase support is disabled")
+	}
+	plID, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("bad playlist id %q", idText)
+	}
+	first := -1
+	for offset := 0; ; {
+		tracks, total, err := s.ncm.PlaylistTracks(r.Context(), plID, offset, 200)
+		if err != nil {
+			return first, err
+		}
+		if len(tracks) == 0 {
+			break
+		}
+		for _, t := range tracks {
+			qid, err := s.addTrack(t)
+			if err != nil {
+				continue // one unplayable track must not abort the album
+			}
+			if first < 0 {
+				first = qid
+			}
+		}
+		offset += len(tracks)
+		if offset >= total {
+			break
+		}
+	}
+	if first < 0 {
+		return 0, fmt.Errorf("playlist %d: nothing could be queued", plID)
+	}
+	return first, nil
+}
+
+// addTrack applies the local-first rule using metadata already in hand.
+func (s *Server) addTrack(t netease.Track) (int, error) {
+	if rel, ok := s.ncm.LocalPath(t.ID); ok {
+		if qid, err := s.pl.AddTagged(rel, nil); err == nil {
+			return qid, nil
+		}
+		_ = s.pl.Update(topSegment(rel))
+	}
+	return s.pl.AddTagged(s.streamURL(t.ID), map[string]string{
+		"Title": t.Title, "Artist": t.Artist, "Album": t.Album,
+	})
 }

@@ -115,7 +115,7 @@ func main() {
 
 	httpSrv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           srv.Routes(web.Handler()),
+		Handler:           srv.Routes(web.Handler(version)),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

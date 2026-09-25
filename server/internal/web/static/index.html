@@ -50,6 +50,9 @@
   .list .meta { flex:0 0 auto; text-align:right; color:var(--mut); font-size:12px; line-height:1.35; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .list .meta b { color:var(--fg); font-weight:500; }
   #lib-summary { margin:-2px 0 8px; }
+  .meta-row { display:flex; justify-content:space-between; align-items:center; color:var(--mut); font-size:12px; margin:6px 0 10px; }
+  #play-all { padding:6px 12px; font-size:13px; }
+  .list .meta.err { color:#d9534f; }
   .volrow { display:flex; align-items:center; gap:10px; }
   .volrow input { flex:1 1 auto; }
   .volrow .act { min-width:44px; font-size:18px; padding:6px 0; }
@@ -63,7 +66,7 @@
   <div class="sub" id="artist"></div>
   <div class="badge" id="fmt">—</div>
   <div class="bar"><i id="prog"></i></div>
-  <div class="meta"><span id="elapsed">0:00</span><span id="duration">0:00</span></div>
+  <div class="meta"><span id="elapsed">0:00</span><span id="qpos"></span><span id="duration">0:00</span></div>
 </div>
 
 <div class="card row">
@@ -92,8 +95,12 @@
     <div class="tabs">
       <button class="tab on" id="tab-ncm">NetEase</button>
       <button class="tab" id="tab-lib">Library</button>
+      <button class="tab" id="tab-dl">Downloads</button>
     </div>
-    <button id="browse-back" hidden>← Back</button>
+    <div class="row" style="flex:0 0 auto;gap:6px">
+      <button class="act" id="play-all" hidden>▶ Play all</button>
+      <button id="browse-back" hidden>← Back</button>
+    </div>
   </div>
   <div class="sub" id="browse-title" style="margin-bottom:6px"></div>
   <input id="lib-search" placeholder="Search library…" hidden>
@@ -108,6 +115,11 @@
     <div><img id="login-qr" alt="" hidden style="width:220px;height:220px;border-radius:10px;background:#fff;padding:8px"></div>
   </div>
   <div class="sub" id="browse-status">loading…</div>
+  <div id="dl-panel" hidden>
+    <div class="sub" id="dl-now">Nothing downloading.</div>
+    <div class="bar"><i id="dl-prog"></i></div>
+    <div class="meta-row"><span id="dl-pct"></span><button class="act" id="dl-clear">Clear list</button></div>
+  </div>
   <ul class="list" id="browse-list"></ul>
 </div>
 <script src="app.js"></script>

@@ -104,6 +104,7 @@ type Status struct {
 	Random    bool    `json:"random"`
 	Single    bool    `json:"single"`
 	Consume   bool    `json:"consume"`
+	QueueLen  int     `json:"queue_length"`
 	Song      *Song   `json:"song"`
 	Format    *Format `json:"format"`
 }
@@ -209,6 +210,7 @@ func (p *Player) Status() (Status, error) {
 		st.Repeat, st.Random = isOn(a["repeat"]), isOn(a["random"])
 		st.Single, st.Consume = isOn(a["single"]), isOn(a["consume"])
 		st.QID, st.Pos = atoi(a["songid"]), atoi(a["song"])
+		st.QueueLen = atoi(a["playlistlength"])
 		st.Format = parseAudio(a["audio"])
 		cur, err := cl.CurrentSong()
 		if err != nil {

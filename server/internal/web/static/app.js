@@ -46,6 +46,7 @@ function render(st) {
   const dur = st.duration || song.duration || 0;
   $("elapsed").textContent = mmss(st.elapsed);
   $("duration").textContent = mmss(dur);
+  $("qpos").textContent = st.queue_length > 1 ? `${(st.pos || 0) + 1} / ${st.queue_length}` : "";
   $("prog").style.width = dur ? Math.min(100, (st.elapsed / dur) * 100) + "%" : "0";
   if (!dragging && st.volume >= 0) {
     $("vol").value = st.volume;
@@ -137,6 +138,7 @@ function setStatus(text) {
 async function showPlaylists() {
   viewingPlaylist = null;
   reloadTracks = null;
+  setPlayAll(null);
   refreshDownloads();
   bTitle.textContent = "NetEase";
   bBack.hidden = true;
@@ -173,13 +175,19 @@ async function showTracks(id, name) {
     setStatus("could not load tracks");
     return;
   }
-  setStatus(`${r.items.length} of ${r.total} tracks`);
-  const count = () => setStatus(` of  tracks`);
+  const count = () => setStatus(`${r.items.length} of ${r.total} tracks`);
+  count();
+  setPlayAll(async () => {
+    setStatus(`queueing all ${r.total} tracks…`);
+    const st = await call("/queue", "POST", { items: [{ ref: "ncm:playlist:" + id }], mode: "replace", play: true });
+    count();
+    return st;
+  });
   r.items.forEach((t) => {
     const li = document.createElement("li");
     const txt = document.createElement("div");
     txt.className = "txt";
-    txt.innerHTML = `<div class="n"></div><div class="s"></div>`;
+    txt.innerHTML = `<div class="n">${t.title}</div><div class="s">${t.artist}</div>`;
     li.innerHTML = img(t.cover);
     li.appendChild(txt);
 
@@ -199,9 +207,12 @@ async function showTracks(id, name) {
     li.appendChild(dl);
 
     txt.onclick = async () => {
-      setStatus(`loading ""…`);
-      const st = await call("/queue", "POST", { items: [{ ref: t.ref }], mode: "replace", play: true });
-      if (st) { render(st); count(); } else setStatus(`could not play ""`);
+      // play from this track onward, like tapping a song inside an album
+      const from = r.items.indexOf(t);
+      const items = r.items.slice(from).map((x) => ({ ref: x.ref }));
+      setStatus(`queueing ${items.length} track(s) from "${t.title}"…`);
+      const st = await call("/queue", "POST", { items, mode: "replace", play: true });
+      if (st) { render(st); count(); } else setStatus(`could not play "${t.title}"`);
     };
     bList.appendChild(li);
   });
@@ -265,11 +276,16 @@ function setMode(m) {
   mode = m;
   tabNcm.classList.toggle("on", m === "ncm");
   tabLib.classList.toggle("on", m === "lib");
+  tabDl.classList.toggle("on", m === "dl");
   libSearch.hidden = m !== "lib";
   if (m !== "lib") libSummary.hidden = true;
+  dlPanel.hidden = m !== "dl";
+  if (m !== "dl") clearInterval(dlTimer);
   dlBtn.hidden = true;
+  setPlayAll(null);
   if (m === "ncm") { libSearch.value = ""; showPlaylists(); }
-  else { libPath = ""; showLibrary(""); }
+  else if (m === "lib") { libPath = ""; showLibrary(""); }
+  else showDownloads();
 }
 
 function libRow(e) {
@@ -294,10 +310,11 @@ function libRow(e) {
   }
   li.onclick = async () => {
     if (isDir) { showLibrary(e.path); return; }
-    setStatus(`loading "${e.title}"…`);
-    const st = await call("/queue", "POST", {
-      items: [{ ref: "local:" + e.path }], mode: "replace", play: true,
-    });
+    const siblings = currentEntries.filter((x) => x.type === "file");
+    const from = Math.max(0, siblings.indexOf(e));
+    const items = siblings.slice(from).map((x) => ({ ref: "local:" + x.path }));
+    setStatus(`queueing ${items.length} track(s) from "${e.title}"…`);
+    const st = await call("/queue", "POST", { items, mode: "replace", play: true });
     if (st) render(st);
     setStatus("");
   };
@@ -318,6 +335,10 @@ async function showLibrary(p) {
   const secs = files.reduce((a, e) => a + (e.duration || 0), 0);
   setStatus(`${r.items.length} item(s)` + (files.length ? ` · ${files.length} file(s) · ${fmtBytes(bytes)} · ${mmss(secs)}` : ""));
   refreshLibSummary();
+  currentEntries = r.items;
+  setPlayAll(files.length ? async () => call("/queue", "POST", {
+    items: files.map((x) => ({ ref: "local:" + x.path })), mode: "replace", play: true,
+  }) : null);
   r.items.forEach((e) => bList.appendChild(libRow(e)));
 }
 
@@ -330,6 +351,8 @@ async function runLibSearch(q) {
   bBack.hidden = false;
   bBack.onclick = () => showLibrary(libPath);
   setStatus(`${r.items.length} result(s) · ${fmtBytes(r.items.reduce((a, e) => a + (e.size || 0), 0))}`);
+  currentEntries = r.items;
+  setPlayAll(null);
   r.items.forEach((e) => bList.appendChild(libRow(e)));
 }
 
@@ -431,3 +454,68 @@ setInterval(refreshLibSummary, 30000);
 const nudge = async (d) => render(await call("/player/volume", "PUT", { delta: d }));
 $("vol-down").onclick = () => nudge(-1);
 $("vol-up").onclick = () => nudge(+1);
+
+// ---- play all / play from here --------------------------------------------------
+let currentEntries = [];   // library rows currently shown (for play-from-here)
+const playAllBtn = $("play-all");
+let playAllAction = null;
+function setPlayAll(fn) {
+  playAllAction = fn;
+  playAllBtn.hidden = !fn;
+}
+playAllBtn.onclick = async () => {
+  if (!playAllAction) return;
+  const label = playAllBtn.textContent;
+  playAllBtn.textContent = "…";
+  const st = await playAllAction();
+  playAllBtn.textContent = label;
+  if (st) render(st);
+};
+
+// ---- Downloads tab ---------------------------------------------------------------
+const tabDl = $("tab-dl");
+const dlPanel = $("dl-panel");
+const dlNow = $("dl-now");
+const dlProg = $("dl-prog");
+const dlPct = $("dl-pct");
+let dlTimer = null;
+
+function renderDlPanel(s) {
+  if (!s) return;
+  const cur = s.current_item;
+  if (cur) {
+    const pct = s.current_size ? Math.min(100, (100 * s.current_bytes) / s.current_size) : 0;
+    dlNow.textContent = `Downloading: ${cur.artist} — ${cur.title}`;
+    dlProg.style.width = pct + "%";
+    dlPct.textContent = s.current_size
+      ? `${fmtBytes(s.current_bytes)} of ${fmtBytes(s.current_size)} (${pct.toFixed(0)}%)`
+      : fmtBytes(s.current_bytes || 0);
+  } else {
+    dlNow.textContent = "Nothing downloading.";
+    dlProg.style.width = "0";
+    dlPct.textContent = "";
+  }
+  bList.innerHTML = "";
+  const add = (label, it, cls) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<img alt=""><div class="txt"><div class="n">${it.title || it.id}</div><div class="s">${it.artist || ""}</div></div><div class="meta ${cls || ""}">${label}</div>`;
+    bList.appendChild(li);
+  };
+  (s.pending || []).forEach((it) => add("queued", it));
+  (s.failed || []).forEach((it) => add("failed" + (it.tries ? " x" + it.tries : ""), it, "err"));
+  const nPend = (s.pending || []).length, nFail = (s.failed || []).length;
+  setStatus(`${s.done} finished this session · ${nPend} queued · ${nFail} failed · ${s.total_on_disk} on disk (${fmtBytes(s.on_disk_bytes || 0)})`);
+}
+
+async function showDownloads() {
+  bTitle.textContent = "Download list";
+  bBack.hidden = true;
+  dlPanel.hidden = false;
+  renderDlPanel(await call("/netease/downloads", "GET"));
+  clearInterval(dlTimer);
+  dlTimer = setInterval(async () => {
+    if (mode === "dl") renderDlPanel(await call("/netease/downloads", "GET"));
+  }, 2000);
+}
+$("dl-clear").onclick = async () => renderDlPanel(await call("/netease/downloads", "DELETE"));
+tabDl.onclick = () => setMode("dl");

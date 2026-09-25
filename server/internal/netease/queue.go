@@ -28,6 +28,9 @@ type Queue struct {
 	pending []Item
 	failed  []Item
 	current string
+	curItem *Item
+	curDone int64
+	curSize int64
 	done    int
 	lastErr string
 	wake    chan struct{}
@@ -45,6 +48,9 @@ type QueueStatus struct {
 	Pending     []Item `json:"pending"`
 	Failed      []Item `json:"failed"`
 	Current     string `json:"current,omitempty"`
+	CurrentItem *Item  `json:"current_item,omitempty"`
+	CurrentDone int64  `json:"current_bytes"`
+	CurrentSize int64  `json:"current_size"`
 	Done        int    `json:"done"`
 	TotalOnDisk int    `json:"total_on_disk"`
 	OnDiskBytes int64  `json:"on_disk_bytes"`
@@ -137,6 +143,9 @@ func (q *Queue) Status() QueueStatus {
 		Pending:     append([]Item(nil), q.pending...),
 		Failed:      append([]Item(nil), q.failed...),
 		Current:     q.current,
+		CurrentItem: q.curItem,
+		CurrentDone: q.curDone,
+		CurrentSize: q.curSize,
 		Done:        q.done,
 		TotalOnDisk: q.c.Downloaded(),
 		OnDiskBytes: q.c.DownloadedBytes(),
@@ -170,12 +179,19 @@ func (q *Queue) Run(ctx context.Context) {
 
 		q.mu.Lock()
 		q.current = it.Artist + " — " + it.Title
+		cur := it
+		q.curItem, q.curDone, q.curSize = &cur, 0, 0
 		q.mu.Unlock()
 
-		rel, err := q.c.Download(ctx, it.ID)
+		rel, err := q.c.DownloadWithProgress(ctx, it.ID, func(done, total int64) {
+			q.mu.Lock()
+			q.curDone, q.curSize = done, total
+			q.mu.Unlock()
+		})
 
 		q.mu.Lock()
 		q.current = ""
+		q.curItem, q.curDone, q.curSize = nil, 0, 0
 		if err != nil {
 			if ctx.Err() != nil {
 				// shutting down: put it back untouched

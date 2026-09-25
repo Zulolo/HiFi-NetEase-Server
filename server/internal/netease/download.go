@@ -116,10 +116,19 @@ func safeName(s string) string {
 	return s
 }
 
+// Progress is called during a download with bytes copied so far and the total
+// (0 when unknown), so a UI can show a percentage.
+type Progress func(done, total int64)
+
 // Download fetches one song at the best level the account is granted and files
 // it under <music>/netease/<Artist>/<Album>/<Title>.<ext> with tags embedded
 // (FR-1.5). It is idempotent: an already-indexed, present file is a no-op.
 func (c *Client) Download(ctx context.Context, id int64) (string, error) {
+	return c.DownloadWithProgress(ctx, id, nil)
+}
+
+// DownloadWithProgress is Download with a progress callback.
+func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Progress) (string, error) {
 	if c.musicDir == "" {
 		return "", errors.New("netease: music directory not configured")
 	}
@@ -174,7 +183,13 @@ func (c *Client) Download(ctx context.Context, id int64) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("netease: download status %s", resp.Status)
 	}
-	n, err := io.Copy(tmp, resp.Body)
+	var n int64
+	if report == nil {
+		n, err = io.Copy(tmp, resp.Body)
+	} else {
+		report(0, res.Size)
+		n, err = io.Copy(tmp, &progressReader{r: resp.Body, total: res.Size, report: report})
+	}
 	if err != nil {
 		return "", fmt.Errorf("netease: download body: %w", err)
 	}
@@ -252,4 +267,23 @@ func (c *Client) DownloadedBytes() int64 {
 	}
 	c.idx.bytes, c.idx.bytesAt = total, time.Now()
 	return total
+}
+
+// progressReader reports every ~512 kB so the UI moves without flooding.
+type progressReader struct {
+	r      io.Reader
+	done   int64
+	total  int64
+	last   int64
+	report Progress
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.done += int64(n)
+	if p.done-p.last >= 512<<10 || err != nil {
+		p.last = p.done
+		p.report(p.done, p.total)
+	}
+	return n, err
 }
