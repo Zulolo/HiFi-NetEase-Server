@@ -108,8 +108,13 @@ file discarded) and puts that track back at the head, and Clear list still drops
 waiting. Bulk adds are safe to repeat, since tracks on disk are skipped at add time and again
 just before fetch.
 
-Still open in M2, none of it blocking daily use: daily recommendations, cloud disk, and
-playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
+Also 2026-09-25: a power-off button in the header (`POST /system/poweroff`, polkit rule for
+the `hifid` user, confirm dialog), tap-to-seek on the progress bar, and repeat/shuffle
+toggles under the transport row (the API had seek and options since M1; only the PWA lacked
+them). Cloud disk (云盘) is dropped: the owner does not use it.
+
+Still open in M2, none of it blocking daily use: daily recommendations, album/artist pages
+from a search result, and playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
 pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.
@@ -125,8 +130,10 @@ night; go-musicfox no longer needed.
 
 ## M3 · Import and library · ~1–2 weeks
 
-1. Samba share (installed in M0) wired to `hifid`: inotify watcher, debounced incremental
-   MPD updates, "recently added" index, duplicate warning.
+1. Samba share (installed in M0) wired to `hifid`: "recently added" index, duplicate warning.
+   (An inotify watcher is not needed: `mpd.conf` runs with `auto_update yes`, depth 3, so
+   files dropped on the share are indexed by MPD itself; `hifid` adds targeted updates for
+   its own downloads.)
 2. Library screens (artists/albums/folders/recent), `update` triggers, cover art.
 3. tus endpoint, finalize pipeline, hash verification (secondary path).
 4. Upload page in the PWA (drag-and-drop folders, parallel chunks, resume after reload).

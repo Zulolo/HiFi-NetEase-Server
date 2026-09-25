@@ -24,7 +24,7 @@ confirm the router does not enable AP/client isolation (it blocks mDNS and Samba
    mkdir -p /srv/music/{local,netease,playlists} /srv/data/{mpd,hifid,incoming} ; chown mpd:audio / hifid:audio
 4. udev: copy deploy/udev/90-hifi-dac.rules ; udevadm control --reload ; replug dongles ; check /proc/asound/cards
 5. MPD: copy deploy/mpd/mpd.conf.example -> /etc/mpd.conf (hifid regenerates it later) ; drop-in deploy/systemd/mpd.service.d/override.conf
-6. hifid: build it (`cd server && go build -o dist/hifid ./cmd/hifid`), then `sudo deploy/scripts/install-hifid.sh --binary server/dist/hifid` — it creates the `hifid` system user, `/etc/hifid/config.yaml`, a generated token in `/etc/hifid/env` (0640 root:hifid), installs the binary and enables `hifid.service`. Re-running keeps an existing config and token.
+6. hifid: build it (`cd server && go build -o dist/hifid ./cmd/hifid`), then `sudo deploy/scripts/install-hifid.sh --binary server/dist/hifid` — it creates the `hifid` system user, `/etc/hifid/config.yaml`, a generated token in `/etc/hifid/env` (0640 root:hifid), installs the binary, the polkit rule that lets the `hifid` user power the board off from the phone (`deploy/polkit/50-hifid-power.rules`, power-off only, no reboot), and enables `hifid.service`. Re-running keeps an existing config and token.
 7. Verify: mpc outputs ; curl http://hifi.local/api/v1/system/status ; open http://hifi.local on the phone
 ```
 

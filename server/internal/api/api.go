@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os/exec"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -85,6 +86,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 
 	m.HandleFunc("GET /api/v1/system/status", g(s.status))
 	m.HandleFunc("GET /api/v1/system/stats", g(s.systemStats))
+	m.HandleFunc("POST /api/v1/system/poweroff", g(s.powerOff))
 	m.HandleFunc("GET /api/v1/player", g(s.getPlayer))
 	m.HandleFunc("POST /api/v1/player/play", g(s.play))
 	m.HandleFunc("POST /api/v1/player/pause", g(s.simple(func() error { return s.pl.Pause() })))
@@ -362,6 +364,26 @@ func (s *Server) enrichSong(st *player.Status) {
 			st.Song.NcmID = id
 		}
 	}
+}
+
+// powerOff answers POST /api/v1/system/poweroff by asking systemd to halt the
+// board. hifid is unprivileged, so this relies on the polkit rule shipped in
+// deploy/polkit (logind's power-off action allowed for the hifid user). The
+// reply goes out first; the command runs a moment later so the phone sees it.
+func (s *Server) powerOff(w http.ResponseWriter, r *http.Request) {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "systemctl not available")
+		return
+	}
+	s.log.Warn("power off requested", "from", r.RemoteAddr)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "action": "poweroff"})
+	go func() {
+		time.Sleep(700 * time.Millisecond)
+		out, err := exec.Command("systemctl", "poweroff").CombinedOutput()
+		if err != nil {
+			s.log.Error("power off failed", "err", err, "out", strings.TrimSpace(string(out)))
+		}
+	}()
 }
 
 // systemStats answers GET /api/v1/system/stats with a fresh board sample.

@@ -44,7 +44,7 @@ app. The owner's account is the only account used; nothing is done to bypass lic
 |----|-------------|
 | FR-1.1 | Login with the owner's account using QR-code scan from the NetEase phone app (preferred, avoids password/captcha), with phone+password/captcha and cookie import as fallbacks. |
 | FR-1.2 | Session persists across reboots (cookie stored on the server, encrypted at rest, LAN-only). |
-| FR-1.3 | Browse: my playlists, liked songs (我喜欢的音乐), daily recommendation, playlist detail, album, artist, search, cloud disk (云盘). |
+| FR-1.3 | Browse: my playlists, liked songs (我喜欢的音乐), daily recommendation, playlist detail, album, artist, search. Cloud disk (云盘) was dropped by the owner on 2026-09-25: not needed. |
 | FR-1.4 | Resolve a playable stream URL at the best quality the account is entitled to (standard → higher → exhigh → lossless → hires → …), with graceful downgrade. |
 | FR-1.5 | Download a song / whole playlist to the local library with tags and cover art embedded, so it is playable offline and shows up in the local library. |
 | FR-1.7 | An explicit **download list**, like the desktop client: playing or liking a track never downloads it; only what the owner adds is fetched, in a paced background job, at the download quality ladder. A whole playlist can be added in one action. Downloaded tracks then play from disk, so they do not depend on Wi-Fi (owner decision 2026-09-24, mirroring 音质播放设置 / 音质下载设置). |

@@ -34,6 +34,8 @@ systemd units such as the DAC hot-plug hook.
 | GET | `/system/status` | version, arch, uptime, mpd {version, connected}, disk {music_total, music_free}, netease {logged_in, nickname, vip}, active_output, event counters |
 | GET | `/system/log?lines=200` | recent structured log lines (admin) |
 | POST | `/system/restart-mpd` | admin; used after output config changes that MPD cannot apply live |
+| GET | `/system/stats` | board sample for the header strip: CPU %, load, MHz, RAM, SoC temperature, Wi-Fi rate and signal |
+| POST | `/system/poweroff` | admin; halts the board via `systemctl poweroff`. hifid is unprivileged, so the install ships `deploy/polkit/50-hifid-power.rules` allowing only logind's power-off action for the `hifid` user (not reboot). Replies `{"ok":true}` first, runs the command 0.7 s later. |
 
 ## 3. Player (transport)
 

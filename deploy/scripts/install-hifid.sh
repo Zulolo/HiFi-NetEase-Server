@@ -85,8 +85,11 @@ for d in /srv/data/hifid /srv/data/incoming; do
   if [ -d "$d" ]; then chgrp audio "$d"; chmod 2775 "$d"; fi
 done
 
-# 6. unit
+# 6. unit + polkit rule (power-off button in the PWA)
 install -m 0644 "$UNIT" /etc/systemd/system/hifid.service
+if [ -d /etc/polkit-1/rules.d ] && [ -f "$here/../polkit/50-hifid-power.rules" ]; then
+  install -m 0644 -o root -g root "$here/../polkit/50-hifid-power.rules" /etc/polkit-1/rules.d/50-hifid-power.rules
+fi
 systemctl daemon-reload
 systemctl enable --now hifid.service
 sleep 2

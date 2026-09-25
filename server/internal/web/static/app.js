@@ -52,8 +52,14 @@ function render(st) {
     $("vol").value = st.volume;
     $("volval").textContent = st.volume + "%";
   }
+  $("repeat").classList.toggle("on", !!st.repeat);
+  $("repeat").setAttribute("aria-pressed", String(!!st.repeat));
+  $("random").classList.toggle("on", !!st.random);
+  $("random").setAttribute("aria-pressed", String(!!st.random));
+  lastDur = dur;
   markPlaying(st);
 }
+let lastDur = 0;
 
 async function refresh() {
   render(await call("/player", "GET"));
@@ -79,6 +85,28 @@ $("stop").onclick = async () => render(await call("/player/stop"));
 $("playpause").onclick = async () => {
   const st = await call("/player", "GET");
   render(st && st.state === "stop" ? await call("/player/play", "POST", {}) : await call("/player/pause"));
+};
+
+$("repeat").onclick = async () => render(await call("/player/options", "PUT", { repeat: !$("repeat").classList.contains("on") }));
+$("random").onclick = async () => render(await call("/player/options", "PUT", { random: !$("random").classList.contains("on") }));
+
+// tap anywhere on the progress bar to seek within the current track
+$("seek").onclick = async (e) => {
+  if (!lastDur) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  $("prog").style.width = frac * 100 + "%";
+  render(await call("/player/seek", "POST", { seconds: Math.floor(frac * lastDur) }));
+};
+
+$("poweroff").onclick = async () => {
+  if (!confirm("Power off HiFi Server? Playback stops and the board halts; unplug and replug power to start it again.")) return;
+  const res = await call("/system/poweroff", "POST", {});
+  if (res && res.ok) {
+    $("title").textContent = "Shutting down…";
+    $("artist").textContent = "Wait for the board LED to go off before unplugging.";
+    $("dot").className = "dot";
+  }
 };
 
 $("vol").oninput = (e) => {

@@ -1,0 +1,10 @@
+// Let the unprivileged hifid service user power off the board from the phone
+// UI (POST /api/v1/system/poweroff runs `systemctl poweroff`, which asks
+// logind over D-Bus; logind asks polkit; this rule answers yes for hifid only).
+polkit.addRule(function (action, subject) {
+  if (subject.user == "hifid" &&
+      (action.id == "org.freedesktop.login1.power-off" ||
+       action.id == "org.freedesktop.login1.power-off-multiple-sessions")) {
+    return polkit.Result.YES;
+  }
+});
