@@ -15,6 +15,7 @@ import (
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/sysinfo"
 )
 
 type Server struct {
@@ -83,6 +84,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	g := s.guard
 
 	m.HandleFunc("GET /api/v1/system/status", g(s.status))
+	m.HandleFunc("GET /api/v1/system/stats", g(s.systemStats))
 	m.HandleFunc("GET /api/v1/player", g(s.getPlayer))
 	m.HandleFunc("POST /api/v1/player/play", g(s.play))
 	m.HandleFunc("POST /api/v1/player/pause", g(s.simple(func() error { return s.pl.Pause() })))
@@ -357,4 +359,13 @@ func (s *Server) enrichSong(st *player.Status) {
 			st.Song.NcmID = id
 		}
 	}
+}
+
+// systemStats answers GET /api/v1/system/stats with a fresh board sample.
+func (s *Server) systemStats(w http.ResponseWriter, r *http.Request) {
+	iface := r.URL.Query().Get("iface")
+	if iface == "" {
+		iface = "wlan0"
+	}
+	writeJSON(w, http.StatusOK, sysinfo.Sample(iface))
 }

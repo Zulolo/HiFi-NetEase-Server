@@ -621,3 +621,26 @@ async function playHere(row, ref, items, title, done) {
     if (done) done();
   }
 }
+
+// ---- board status strip --------------------------------------------------------
+// CPU, RAM, temperature, Wi-Fi throughput and signal, uptime, process memory.
+const sysEl = $("sys");
+const fmtRate = (bps) => (bps >= 1e6 ? (bps / 1e6).toFixed(1) + " MB/s" : bps >= 1e3 ? Math.round(bps / 1e3) + " kB/s" : Math.round(bps) + " B/s");
+const fmtUp = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
+async function refreshSys() {
+  const s = await call("/system/stats", "GET");
+  if (!s || s.mem_total === undefined) { sysEl.textContent = ""; return; }
+  const tempCls = s.temp_c >= 80 ? "hot" : s.temp_c >= 70 ? "warn" : "";
+  const cpuCls = s.cpu_percent >= 85 ? "warn" : "";
+  const parts = [
+    `<span class="${cpuCls}">CPU <b>${s.cpu_percent.toFixed(0)}%</b>${s.cpu_mhz ? ` @ ${(s.cpu_mhz / 1000).toFixed(1)} GHz` : ""} · load ${s.load1.toFixed(2)}</span>`,
+    `<span>RAM <b>${fmtBytes(s.mem_used)}</b> / ${fmtBytes(s.mem_total)}</span>`,
+  ];
+  if (s.temp_c) parts.push(`<span class="${tempCls}">SoC <b>${s.temp_c.toFixed(0)} °C</b></span>`);
+  parts.push(`<span>Wi-Fi ↓<b>${fmtRate(s.net_rx_bps)}</b> ↑${fmtRate(s.net_tx_bps)}${s.wifi_dbm ? ` · ${s.wifi_dbm} dBm` : ""}</span>`);
+  parts.push(`<span>hifid ${fmtBytes(s.hifid_rss)} · mpd ${fmtBytes(s.mpd_rss)}</span>`);
+  parts.push(`<span>up <b>${fmtUp(s.uptime_sec)}</b></span>`);
+  sysEl.innerHTML = parts.join("");
+}
+refreshSys();
+setInterval(refreshSys, 3000);

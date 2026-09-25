@@ -11,7 +11,13 @@
   * { box-sizing:border-box; }
   body { margin:0; padding:16px; background:var(--bg); color:var(--fg);
          font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  h1 { font-size:17px; margin:0 0 14px; font-weight:600; letter-spacing:.2px; }
+  h1 { font-size:17px; margin:0; font-weight:600; letter-spacing:.2px; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 14px; }
+  .sys { display:flex; flex-wrap:wrap; gap:4px 14px; color:var(--mut); font-size:12px; font-variant-numeric:tabular-nums; }
+  .sys span { white-space:nowrap; }
+  .sys b { color:var(--fg); font-weight:500; }
+  .sys .warn b { color:#e0a030; }
+  .sys .hot b { color:#d9534f; }
   .card { background:var(--card); border-radius:12px; padding:14px; margin-bottom:12px; }
   .title { font-size:19px; font-weight:600; margin-bottom:2px; word-break:break-word; }
   .sub { color:var(--mut); font-size:14px; }
@@ -64,7 +70,10 @@
 </style>
 </head>
 <body>
-<h1><span id="dot" class="dot"></span><span id="server">HiFi Server</span></h1>
+<div class="top">
+  <h1><span id="dot" class="dot"></span><span id="server">HiFi Server</span></h1>
+  <div class="sys" id="sys" title="board status, refreshed every 3 s"></div>
+</div>
 
 <div class="card">
   <div class="title" id="title">Nothing playing</div>
