@@ -94,8 +94,16 @@ cookie jar persists the session within its 3 s sync. Verified by deleting the se
 `ncmctl` cookie, logging in fresh from the phone, restarting `hifid` and finding the session
 intact, then streaming a track on it. Nothing but the session cookie ever reaches the server.
 
-Still open in M2, none of it blocking daily use: search and daily recommendations, cloud
-disk, and playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
+Catalogue search landed on 2026-09-25 (FR-1.3): the library (v0.8.1) only wraps keyword
+*suggestions*, so `hifid` posts to `weapi/cloudsearch/pc` itself through the library's
+authenticated weapi client (same encryption, same cookie jar) and serves
+`GET /netease/search?q=&offset=&limit=` (songs only, `total` for paging). Results are the
+same row type as playlist tracks: tap to play live at lossless, arrow to add to the download
+list, `on_disk` when a copy already exists. The PWA shows the search box on the NetEase tab,
+debounced 400 ms, 50 results per page.
+
+Still open in M2, none of it blocking daily use: daily recommendations, cloud disk, and
+playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
 pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.

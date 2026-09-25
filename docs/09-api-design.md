@@ -126,7 +126,7 @@ GET  /netease/recommend/daily        -> Song[]
 GET  /netease/playlist/{id}?offset&limit
 GET  /netease/album/{id}
 GET  /netease/artist/{id}/songs?offset&limit
-GET  /netease/search?q=&type=song|album|artist|playlist&offset&limit
+GET  /netease/search?q=&offset&limit  -> {"query":"…","items":Track[],"total":327}   // songs only for now; Track as in playlist rows
 GET  /netease/cloud?offset&limit     -> CloudSong[]
 GET  /netease/song/{id}              -> Song + {"levels_available":["standard","exhigh","lossless","hires"],"trial":false,"local_copy":"netease/…/x.flac"|null}
 POST /netease/playlists/export       {}                 // regenerate MPD stored playlists (docs/08 §6)
