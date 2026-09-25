@@ -30,7 +30,9 @@ from disk), and browse everything already on the disk, uploads included. Start w
 
 ```
 docs/          design documents 00–12 and ADRs (start with docs/00-overview.md)
-server/        hifid Go service: MPD adapter, NetEase adapter + pipe proxy, download list, REST/WS API, embedded PWAweb/           (the PWA currently lives in server/internal/web/static and is embedded into hifid)android/       optional native app (planned, phase 3)
+server/        hifid Go service: MPD adapter, NetEase adapter + pipe proxy, download list, REST/WS API, embedded PWA
+web/           (the PWA currently lives in server/internal/web/static and is embedded into hifid)
+android/       optional native app (planned, phase 3)
 deploy/        mpd.conf template, udev rules, systemd units, probe and watchdog scripts
 tools/         bench scripts to fill the measurement tables in docs/05
 ```
