@@ -223,3 +223,17 @@ func (s *Server) ncmLoginStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, st)
 }
+
+// ncmSearch answers GET /api/v1/netease/search?q=&offset=&limit=.
+func (s *Server) ncmSearch(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	q := r.URL.Query().Get("q")
+	tracks, total, err := s.ncm.Search(r.Context(), q, queryInt(r, "offset", 0), queryInt(r, "limit", 50))
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"query": q, "items": tracks, "total": total})
+}

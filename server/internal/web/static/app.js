@@ -297,6 +297,8 @@ function setMode(m) {
   tabLib.classList.toggle("on", m === "lib");
   tabDl.classList.toggle("on", m === "dl");
   libSearch.hidden = m !== "lib";
+  ncmSearch.hidden = m !== "ncm";
+  if (m !== "ncm") ncmSearch.value = "";
   if (m !== "lib") libSummary.hidden = true;
   dlPanel.hidden = m !== "dl";
   if (m !== "dl") clearInterval(dlTimer);
@@ -673,3 +675,66 @@ async function refreshSys() {
 }
 refreshSys();
 setInterval(refreshSys, 3000);
+
+// ---- NetEase search --------------------------------------------------------------
+// Results render with the same rows as a playlist: tap to play (live, at the
+// streaming ladder, or from disk if downloaded), ↓ to add to the download list.
+const ncmSearch = $("ncm-search");
+let ncmSearchTimer = null;
+
+function renderTrackRows(items, statusText) {
+  // shared renderer for playlist pages and search results
+  bList.innerHTML = "";
+  const r = { items, total: items.length };
+  const count = () => setStatus(statusText || `${items.length} track(s)`);
+  count();
+  items.forEach((t) => {
+    const li = document.createElement("li");
+    const txt = document.createElement("div");
+    txt.className = "txt";
+    txt.innerHTML = `<div class="n">${t.title}</div><div class="s">${t.artist}${t.album ? " — " + t.album : ""}</div>`;
+    li.innerHTML = img(t.cover);
+    li.appendChild(txt);
+    const dl = document.createElement("button");
+    dl.className = "act dlbtn";
+    dl.dataset.ncm = t.id;
+    if (t.on_disk) dl.dataset.state = "done";
+    paintDlButton(dl);
+    dl.onclick = async (e) => {
+      e.stopPropagation();
+      if (dl.dataset.state === "done") return;
+      dl.textContent = "…";
+      const res = await call("/netease/download", "POST", { ref: t.ref });
+      if (res && res.on_disk) dl.dataset.state = "done";
+      await refreshDownloads();
+    };
+    li.appendChild(dl);
+    li.dataset.ncm = t.id;
+    txt.onclick = async () => {
+      const from = r.items.indexOf(t);
+      const rest = r.items.slice(from).map((x) => ({ ref: x.ref, title: x.title, artist: x.artist, album: x.album }));
+      await playHere(li, t.ref, rest, t.title, count);
+    };
+    bList.appendChild(li);
+  });
+  refresh();
+}
+
+async function runNcmSearch(q) {
+  viewingPlaylist = null;
+  setPlayAll(null);
+  bTitle.textContent = `Search: ${q}`;
+  bBack.hidden = false;
+  bBack.onclick = () => { ncmSearch.value = ""; showPlaylists(); };
+  setStatus("searching NetEase…");
+  bList.innerHTML = "";
+  const res = await call("/netease/search?q=" + encodeURIComponent(q) + "&limit=50", "GET");
+  if (!res || !res.items) { setStatus("search failed"); return; }
+  renderTrackRows(res.items, `${res.items.length} of ${res.total} result(s)`);
+}
+
+ncmSearch.oninput = (e) => {
+  const q = e.target.value.trim();
+  clearTimeout(ncmSearchTimer);
+  ncmSearchTimer = setTimeout(() => (q ? runNcmSearch(q) : showPlaylists()), 400);
+};

@@ -76,7 +76,7 @@
   .tabs { display:flex; gap:6px; }
   .tab { flex:0 0 auto; min-width:0; padding:6px 14px; font-size:13px; background:#20262c; color:var(--mut); border-radius:999px; }
   .tab.on { background:#2f3b46; color:var(--fg); }
-  #lib-search { width:100%; padding:10px; margin-bottom:8px; border:0; border-radius:10px; background:#242a30; color:var(--fg); font-size:15px; }
+  #lib-search, #ncm-search { width:100%; padding:10px; margin-bottom:8px; border:0; border-radius:10px; background:#242a30; color:var(--fg); font-size:15px; }
   .list .meta { flex:0 0 auto; text-align:right; color:var(--mut); font-size:12px; line-height:1.35; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .list .meta b { color:var(--fg); font-weight:500; }
   #lib-summary { margin:-2px 0 8px; }
@@ -140,6 +140,7 @@
   </div>
   <div class="sub" id="browse-title" style="margin-bottom:6px"></div>
   <input id="lib-search" placeholder="Search library…" hidden>
+  <input id="ncm-search" placeholder="Search NetEase…" hidden>
   <div class="sub" id="lib-summary" hidden></div>
   <div class="syncbar">
     <div class="sub" id="dl-status"></div>
