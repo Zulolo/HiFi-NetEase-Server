@@ -90,6 +90,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("POST /api/v1/player/next", g(s.simple(s.pl.Next)))
 	m.HandleFunc("POST /api/v1/player/prev", g(s.simple(s.pl.Prev)))
 	m.HandleFunc("POST /api/v1/player/seek", g(s.seek))
+	m.HandleFunc("POST /api/v1/player/jump", g(s.jump))
 	m.HandleFunc("PUT /api/v1/player/volume", g(s.volume))
 	m.HandleFunc("PUT /api/v1/player/options", g(s.options))
 

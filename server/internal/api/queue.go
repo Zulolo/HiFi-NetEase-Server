@@ -17,6 +17,11 @@ func (s *Server) addQueue(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Items []struct {
 			Ref string `json:"ref"`
+			// Optional metadata the client already has (a rendered track list).
+			// With it, no per-track NetEase lookup is needed to tag the entry.
+			Title  string `json:"title"`
+			Artist string `json:"artist"`
+			Album  string `json:"album"`
 		} `json:"items"`
 		Mode string `json:"mode"` // append (default) | replace
 		Play bool   `json:"play"`
@@ -38,6 +43,7 @@ func (s *Server) addQueue(w http.ResponseWriter, r *http.Request) {
 
 	var firstQID = -1
 	var added int
+	var lastErr error
 	for _, it := range req.Items {
 		ref := strings.TrimSpace(it.Ref)
 		var (
@@ -48,7 +54,7 @@ func (s *Server) addQueue(w http.ResponseWriter, r *http.Request) {
 		case strings.HasPrefix(ref, "ncm:playlist:"):
 			qid, err = s.addNCMPlaylist(r, strings.TrimPrefix(ref, "ncm:playlist:"))
 		case strings.HasPrefix(ref, "ncm:"):
-			qid, err = s.addNCM(r, ref)
+			qid, err = s.addNCM(r, ref, netease.Track{Title: it.Title, Artist: it.Artist, Album: it.Album})
 		case strings.HasPrefix(ref, "local:"):
 			uri := strings.TrimPrefix(ref, "local:")
 			qid, err = s.pl.AddTagged(uri, nil)
@@ -56,25 +62,38 @@ func (s *Server) addQueue(w http.ResponseWriter, r *http.Request) {
 			err = fmt.Errorf("unsupported ref %q", ref)
 		}
 		if err != nil {
-			writeErr(w, http.StatusBadGateway, "queue_add_failed", err.Error())
-			return
-		}
-		if firstQID < 0 {
-			firstQID = qid
+			// one unplayable track must not abort the rest of the list
+			lastErr = err
+			continue
 		}
 		added++
-	}
-
-	if req.Play && firstQID >= 0 {
-		if err := s.pl.PlayID(firstQID); err != nil {
-			writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
-			return
+		if firstQID < 0 {
+			firstQID = qid
+			// Start playing as soon as the first track is in, not after the
+			// last: a long list then plays within a fraction of a second
+			// while the rest is still being added.
+			if req.Play {
+				if perr := s.pl.PlayID(firstQID); perr != nil {
+					writeErr(w, http.StatusBadGateway, "mpd_error", perr.Error())
+					return
+				}
+			}
 		}
+	}
+	if added == 0 {
+		msg := "nothing could be queued"
+		if lastErr != nil {
+			msg = lastErr.Error()
+		}
+		writeErr(w, http.StatusBadGateway, "queue_add_failed", msg)
+		return
 	}
 	s.respondState(w)
 }
 
-func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
+// addNCM enqueues one NetEase track. meta may carry the title, artist and
+// album the client already knows; when it is empty they are looked up.
+func (s *Server) addNCM(r *http.Request, ref string, meta netease.Track) (int, error) {
 	if s.ncm == nil {
 		return 0, fmt.Errorf("NetEase support is disabled")
 	}
@@ -99,14 +118,18 @@ func (s *Server) addNCM(r *http.Request, ref string) (int, error) {
 			s.log.Warn("local copy not playable yet, streaming instead", "path", rel, "err", err)
 		}
 	}
-	// Metadata is best-effort: a tagging failure must not stop playback.
-	tags := map[string]string{}
-	if t, err := s.ncm.TrackInfo(r.Context(), id); err == nil {
-		tags["Title"] = t.Title
-		tags["Artist"] = t.Artist
-		tags["Album"] = t.Album
+	// Metadata is best-effort: a tagging failure must not stop playback. Use
+	// what the client sent; only ask NetEase when it sent nothing, because a
+	// lookup per track is what made queueing a hundred tracks take tens of
+	// seconds.
+	if meta.Title == "" {
+		if t, err := s.ncm.TrackInfo(r.Context(), id); err == nil {
+			meta = t
+		}
 	}
-	return s.pl.AddTagged(s.streamURL(id), tags)
+	return s.pl.AddTagged(s.streamURL(id), map[string]string{
+		"Title": meta.Title, "Artist": meta.Artist, "Album": meta.Album,
+	})
 }
 
 // streamURL is the loopback address MPD fetches from. MPD runs on the same
@@ -219,4 +242,61 @@ func (s *Server) addTrack(t netease.Track) (int, error) {
 	return s.pl.AddTagged(s.streamURL(t.ID), map[string]string{
 		"Title": t.Title, "Artist": t.Artist, "Album": t.Album,
 	})
+}
+
+// ncmIDOf recovers the NetEase id behind a queue entry's URI: parsed from a
+// proxy stream URL, or reverse-mapped from a downloaded file's path.
+func (s *Server) ncmIDOf(uri string) int64 {
+	if i := strings.Index(uri, "/stream/ncm/"); i >= 0 {
+		id, _ := strconv.ParseInt(strings.TrimRight(uri[i+len("/stream/ncm/"):], "/"), 10, 64)
+		return id
+	}
+	if s.ncm != nil {
+		if id, ok := s.ncm.IDForPath(uri); ok {
+			return id
+		}
+	}
+	return 0
+}
+
+// jump implements POST /player/jump {"ref": "ncm:<id>" | "local:<path>"}: if
+// the track is already in the queue, play that entry in place — no clearing,
+// no re-adding, the rest of the collection stays. 404 means "not queued", and
+// the client then falls back to rebuilding the queue.
+func (s *Server) jump(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Ref string `json:"ref"`
+	}
+	if err := decode(r, &req); err != nil || req.Ref == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "ref is required")
+		return
+	}
+	items, err := s.pl.Queue()
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mpd_unavailable", err.Error())
+		return
+	}
+	wantID, isNCM := netease.ParseRef(req.Ref)
+	wantPath := strings.TrimPrefix(req.Ref, "local:")
+	for _, it := range items {
+		uri := it.Ref
+		if strings.HasPrefix(uri, "local:") {
+			uri = uri[len("local:"):]
+		}
+		match := false
+		if isNCM {
+			match = s.ncmIDOf(uri) == wantID
+		} else {
+			match = uri == wantPath
+		}
+		if match {
+			if err := s.pl.PlayID(it.QID); err != nil {
+				writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
+				return
+			}
+			s.respondState(w)
+			return
+		}
+	}
+	writeErr(w, http.StatusNotFound, "not_queued", "track is not in the current queue")
 }

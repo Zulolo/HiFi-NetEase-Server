@@ -221,12 +221,11 @@ async function showTracks(id, name) {
     li.dataset.ncm = t.id;
 
     txt.onclick = async () => {
-      // play from this track onward, like tapping a song inside an album
+      // Already in the queue (e.g. after Play all)? Jump there: instant, and
+      // the rest of the collection stays. Otherwise rebuild from this track.
       const from = r.items.indexOf(t);
-      const items = r.items.slice(from).map((x) => ({ ref: x.ref }));
-      setStatus(`queueing ${items.length} track(s) from "${t.title}"…`);
-      const st = await call("/queue", "POST", { items, mode: "replace", play: true });
-      if (st) { render(st); count(); } else setStatus(`could not play "${t.title}"`);
+      const items = r.items.slice(from).map((x) => ({ ref: x.ref, title: x.title, artist: x.artist, album: x.album }));
+      await playHere(li, t.ref, items, t.title, count);
     };
     bList.appendChild(li);
   });
@@ -345,10 +344,7 @@ function libRow(e) {
     const siblings = currentEntries.filter((x) => x.type === "file");
     const from = Math.max(0, siblings.indexOf(e));
     const items = siblings.slice(from).map((x) => ({ ref: "local:" + x.path }));
-    setStatus(`queueing ${items.length} track(s) from "${e.title}"…`);
-    const st = await call("/queue", "POST", { items, mode: "replace", play: true });
-    if (st) render(st);
-    setStatus("");
+    await playHere(li, "local:" + e.path, items, e.title, () => setStatus(""));
   };
   return li;
 }
@@ -601,4 +597,27 @@ function paintDlButton(btn) {
 }
 function updateRowButtons() {
   document.querySelectorAll("button.dlbtn").forEach(paintDlButton);
+}
+
+// ---- tap-to-play: jump if queued, else rebuild from here -------------------------
+// One request at a time: a second tap while the first is running used to start
+// a second rebuild and double the queue.
+let queueBusy = false;
+async function playHere(row, ref, items, title, done) {
+  if (queueBusy) return;
+  queueBusy = true;
+  // immediate feedback on the row itself, before the server answers
+  bList.querySelectorAll("li.playing").forEach((x) => x.classList.remove("playing"));
+  row.classList.add("playing");
+  try {
+    let st = await call("/player/jump", "POST", { ref });
+    if (!st) {
+      setStatus(`queueing ${items.length} track(s) from "${title}"…`);
+      st = await call("/queue", "POST", { items, mode: "replace", play: true });
+    }
+    if (st) render(st); else setStatus(`could not play "${title}"`);
+  } finally {
+    queueBusy = false;
+    if (done) done();
+  }
 }
