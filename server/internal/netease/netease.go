@@ -308,6 +308,11 @@ func (c *Client) ResolveBest(ctx context.Context, id int64) (Resolved, error) {
 	return c.resolve(ctx, id, c.levels, false)
 }
 
+// ErrUnavailable means NetEase has no playable copy of the song for this
+// account at any level (code 404: removed, or no copyright in this region).
+// Retrying cannot help; the download list files it as failed at once.
+var ErrUnavailable = errors.New("netease: song unavailable")
+
 func (c *Client) resolve(ctx context.Context, id int64, ladder []types.Level, useCache bool) (Resolved, error) {
 	if useCache {
 		c.mu.RLock()
@@ -334,6 +339,10 @@ func (c *Client) resolve(ctx context.Context, id int64, ladder []types.Level, us
 			continue
 		}
 		d := resp.Data[0]
+		if d.Code == 404 {
+			// the song itself is gone, not just this level: stop probing
+			return Resolved{}, fmt.Errorf("netease: resolve %d: %w (code 404 at level %s)", id, ErrUnavailable, level)
+		}
 		if d.Url == "" || d.Code != 200 {
 			// not entitled or unavailable at this level: try the next rung
 			lastErr = fmt.Errorf("level %s unavailable (code %d)", level, d.Code)

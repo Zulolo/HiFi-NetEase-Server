@@ -112,6 +112,16 @@ freshly resolved URL, showing "Network stalled (n×) — retrying … in Ns" in 
 Stalls never count as failures; ordinary errors get 5 tries. Stale `.part-*` files from
 killed processes were removed by hand.
 
+Same evening, after a pause → power-off → resume: the worker sat on one track for minutes. Two
+real bugs. (1) The queue cancelled the per-download context *before* checking whether the
+download had been interrupted, so every error looked like a pause and was retried silently in a
+tight loop with no log line, hammering the API. (2) The track was simply gone from NetEase
+(`code 404`), and the ladder probed all six levels before giving up. Now a 404 short-circuits
+as `ErrUnavailable` and goes straight to the failed list, the pre-transfer lookups have a 60 s
+deadline that counts as a stall only when it really timed out, and every failure is logged
+with its cause. The ⏻ button was used for real in this sequence and shut the board down
+cleanly (journal: "power off requested" → "shutting down").
+
 The download list gained pause/resume the same day: the flag is persisted with the list, so
 a paused board stays paused across reboots; pausing cancels the transfer in flight (partial
 file discarded) and puts that track back at the head, and Clear list still drops everything

@@ -145,6 +145,10 @@ const minFreeBytes = 2 << 30
 const (
 	stallWindow   = 20 * time.Second
 	stallMinBytes = 256 << 10 // under ~13 kB/s a 100 MB master would take hours
+	// prepTimeout bounds the metadata + URL lookups before the transfer. A
+	// wedged TCP connection to the API (seen after a reboot: send queue
+	// growing, no acks) otherwise holds the worker for many minutes.
+	prepTimeout = 60 * time.Second
 )
 
 // ErrStalled marks a download aborted by the stall watchdog; the queue keeps
@@ -159,13 +163,16 @@ func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Prog
 	if rel, ok := c.LocalPath(id); ok {
 		return rel, nil
 	}
-	meta, err := c.TrackInfo(ctx, id)
+	prepCtx, cancelPrep := context.WithTimeout(ctx, prepTimeout)
+	meta, err := c.TrackInfo(prepCtx, id)
 	if err != nil {
-		return "", err
+		cancelPrep()
+		return "", prepError(ctx, prepCtx, err)
 	}
-	res, err := c.ResolveBest(ctx, id)
+	res, err := c.ResolveBest(prepCtx, id)
+	cancelPrep()
 	if err != nil {
-		return "", err
+		return "", prepError(ctx, prepCtx, err)
 	}
 
 	ext := strings.ToLower(res.Type)
@@ -324,6 +331,18 @@ func (c *Client) DownloadedBytes() int64 {
 }
 
 // progressReader reports every ~512 kB so the UI moves without flooding.
+// prepError classifies a failure of the pre-transfer lookups: when the prep
+// deadline expired (and the caller did not cancel) it is a network stall, so
+// the queue keeps the track and backs off instead of counting a try.
+func prepError(ctx, prepCtx context.Context, err error) error {
+	timedOut := errors.Is(err, context.DeadlineExceeded) ||
+		strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "timeout")
+	if prepCtx.Err() != nil && ctx.Err() == nil && timedOut {
+		return fmt.Errorf("%w: NetEase API did not answer within %s (%v)", ErrStalled, prepTimeout, err)
+	}
+	return err
+}
+
 // countReader adds every byte read to n, for the stall watchdog.
 type countReader struct {
 	r io.Reader

@@ -250,10 +250,14 @@ func (q *Queue) Run(ctx context.Context) {
 			q.mu.Unlock()
 		})
 
+		// Read the interruption state BEFORE releasing the context: cancel()
+		// itself sets dlCtx.Err(), which once made every failure look like a
+		// pause and retried it silently in a tight loop.
+		interrupted := dlCtx.Err() != nil
 		cancel()
 		q.mu.Lock()
 		q.curCancel = nil
-		if err != nil && dlCtx.Err() != nil {
+		if err != nil && interrupted {
 			// interrupted by shutdown or pause: back to the head of the list
 			// so nothing is lost and it is retried first
 			q.pending = append([]Item{it}, q.pending...)
@@ -291,7 +295,16 @@ func (q *Queue) Run(ctx context.Context) {
 			q.mu.Unlock()
 			continue
 		}
-		if err != nil {
+		if errors.Is(err, ErrUnavailable) {
+			// permanent: NetEase has no copy; straight to the failed list
+			it.Tries = maxTries
+			q.failed = append(q.failed, it)
+			q.lastErr = err.Error()
+			if q.log != nil {
+				q.log.Warn("download unavailable", "song", it.ID, "title", it.Title, "err", err)
+			}
+			// err stays set so OnDownloaded is not called for it
+		} else if err != nil {
 			it.Tries++
 			if q.log != nil {
 				q.log.Warn("download failed", "song", it.ID, "title", it.Title, "try", it.Tries, "err", err)
