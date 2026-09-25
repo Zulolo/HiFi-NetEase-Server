@@ -102,6 +102,16 @@ same row type as playlist tracks: tap to play live at lossless, arrow to add to 
 list, `on_disk` when a copy already exists. The PWA shows the search box on the NetEase tab,
 debounced 400 ms, 50 results per page.
 
+Download robustness (2026-09-25, found during a Download all of 1,473 tracks): the master-quality
+CDN node (183.60.x, a different edge from the 163.181.87.x nodes that serve lossless streams)
+can degrade to a 400 ms RTT with heavy packet reordering, or stop answering SYNs, while a
+fresh connection runs at 1 MB/s. The stream HTTP client now has a 15 s dial timeout, and a
+stall watchdog aborts a transfer moving under 256 kB in 20 s; the queue keeps that track at
+the head and backs off 30 s → 1 → 2 → 5 → 10 min before retrying on a new connection and a
+freshly resolved URL, showing "Network stalled (n×) — retrying … in Ns" in the Downloads tab.
+Stalls never count as failures; ordinary errors get 5 tries. Stale `.part-*` files from
+killed processes were removed by hand.
+
 The download list gained pause/resume the same day: the flag is persisted with the list, so
 a paused board stays paused across reboots; pausing cancels the transfer in flight (partial
 file discarded) and puts that track back at the head, and Clear list still drops everything

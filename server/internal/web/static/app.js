@@ -642,6 +642,11 @@ function renderDlPanel(s) {
     dlPct.textContent = s.current_size
       ? `${fmtBytes(s.current_bytes)} of ${fmtBytes(s.current_size)} (${pct.toFixed(0)}%)`
       : fmtBytes(s.current_bytes || 0);
+  } else if (s.retry_in > 0 && (s.pending || []).length) {
+    const nxt = s.pending[0];
+    dlNow.textContent = `Network stalled (${s.stalls}×) — retrying ${nxt.artist} — ${nxt.title} in ${s.retry_in}s`;
+    dlProg.style.width = "0";
+    dlPct.textContent = s.last_error || "";
   } else {
     dlNow.textContent = s.paused ? "Paused." : "Nothing downloading.";
     dlProg.style.width = "0";

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 )
@@ -92,10 +93,13 @@ func (c *Client) fetch(r *http.Request, res Resolved) (*http.Response, error) {
 }
 
 // streamHTTP has no overall timeout: a 157 MB jymaster track is a long read.
-// The dial and header timeouts still bound a dead CDN.
+// The dial and header timeouts still bound a dead CDN node (seen 2026-09-25:
+// one node stopped answering SYNs while others were fine; without a dial
+// timeout each attempt sat in SYN-SENT for the kernel's two minutes).
 var streamHTTP = &http.Client{
 	Transport: &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		MaxIdleConns:          8,
 		IdleConnTimeout:       60 * time.Second,
 		TLSHandshakeTimeout:   15 * time.Second,

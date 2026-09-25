@@ -40,7 +40,15 @@ type Queue struct {
 	// flight (it goes back to the head of the list). Persisted with the list.
 	paused    bool
 	curCancel context.CancelFunc
+
+	// stalls counts consecutive stall aborts; retryAt is when the worker
+	// tries again (exponential backoff, see stallBackoff).
+	stalls  int
+	retryAt time.Time
 }
+
+// stallBackoff is the wait after the n-th consecutive stall.
+var stallBackoff = []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute, 5 * time.Minute, 10 * time.Minute}
 
 // Item is one queued download.
 type Item struct {
@@ -63,6 +71,9 @@ type QueueStatus struct {
 	OnDiskBytes int64  `json:"on_disk_bytes"`
 	LastError   string `json:"last_error,omitempty"`
 	Paused      bool   `json:"paused"`
+	// RetryIn is seconds until the worker retries after a stall (0 = not waiting).
+	RetryIn int `json:"retry_in,omitempty"`
+	Stalls  int `json:"stalls,omitempty"`
 }
 
 type queueFile struct {
@@ -75,7 +86,7 @@ type queueFile struct {
 	Paused  bool  `json:"paused,omitempty"`
 }
 
-const maxTries = 3
+const maxTries = 5
 
 func NewQueue(c *Client, path string, pace time.Duration, log *slog.Logger) *Queue {
 	if pace <= 0 {
@@ -168,6 +179,8 @@ func (q *Queue) Status() QueueStatus {
 		OnDiskBytes: q.c.DownloadedBytes(),
 		LastError:   q.lastErr,
 		Paused:      q.paused,
+		Stalls:      q.stalls,
+		RetryIn:     max(0, int(time.Until(q.retryAt).Seconds())),
 	}
 }
 
@@ -255,8 +268,34 @@ func (q *Queue) Run(ctx context.Context) {
 		}
 		q.current = ""
 		q.curItem, q.curDone, q.curSize = nil, 0, 0
+		if errors.Is(err, ErrStalled) {
+			// crippled CDN route: keep the track at the head, back off, retry
+			// on a fresh connection (and a fresh URL, ResolveBest is uncached)
+			q.pending = append([]Item{it}, q.pending...)
+			q.stalls++
+			wait := stallBackoff[min(q.stalls, len(stallBackoff))-1]
+			q.retryAt = time.Now().Add(wait)
+			q.lastErr = err.Error()
+			if q.log != nil {
+				q.log.Warn("download stalled", "song", it.ID, "title", it.Title, "stalls", q.stalls, "retry_in", wait.String(), "err", err)
+			}
+			q.save()
+			q.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(wait):
+			}
+			q.mu.Lock()
+			q.retryAt = time.Time{}
+			q.mu.Unlock()
+			continue
+		}
 		if err != nil {
 			it.Tries++
+			if q.log != nil {
+				q.log.Warn("download failed", "song", it.ID, "title", it.Title, "try", it.Tries, "err", err)
+			}
 			q.lastErr = err.Error()
 			if it.Tries >= maxTries {
 				q.failed = append(q.failed, it)
@@ -268,6 +307,7 @@ func (q *Queue) Run(ctx context.Context) {
 			}
 		} else {
 			q.done++
+			q.stalls = 0
 			doneItem := it
 			q.lastDone = &doneItem
 			if q.log != nil {

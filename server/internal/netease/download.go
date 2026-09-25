@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"sync"
 	"time"
 )
@@ -137,6 +138,20 @@ func (c *Client) Download(ctx context.Context, id int64) (string, error) {
 // below it so a full disk never corrupts MPD's database or the state files.
 const minFreeBytes = 2 << 30
 
+// A CDN connection can survive a Wi-Fi hiccup in a crippled state (seconds of
+// RTT, kB/s throughput) while a fresh one runs at full speed. The watchdog
+// drops a transfer that moves fewer than stallMinBytes in stallWindow and the
+// queue retries it at once on a new connection.
+const (
+	stallWindow   = 20 * time.Second
+	stallMinBytes = 256 << 10 // under ~13 kB/s a 100 MB master would take hours
+)
+
+// ErrStalled marks a download aborted by the stall watchdog; the queue keeps
+// the item at the head and backs off before retrying (a bad CDN route is a
+// network condition, not a bad track).
+var ErrStalled = errors.New("netease: download stalled")
+
 func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Progress) (string, error) {
 	if c.musicDir == "" {
 		return "", errors.New("netease: music directory not configured")
@@ -182,28 +197,55 @@ func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Prog
 		os.Remove(tmpName)
 	}()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, res.URL, nil)
+	dlCtx, cancelDl := context.WithCancel(ctx)
+	defer cancelDl()
+	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, res.URL, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("User-Agent", browserUA)
 	resp, err := streamHTTP.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("netease: download: %w", err)
+		return "", fmt.Errorf("netease: download from %s: %w", req.URL.Host, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("netease: download status %s", resp.Status)
 	}
+	var got atomic.Int64
+	var stalled atomic.Bool
+	go func() {
+		t := time.NewTicker(stallWindow)
+		defer t.Stop()
+		last := int64(0)
+		for {
+			select {
+			case <-dlCtx.Done():
+				return
+			case <-t.C:
+				cur := got.Load()
+				if cur-last < stallMinBytes {
+					stalled.Store(true)
+					cancelDl()
+					return
+				}
+				last = cur
+			}
+		}
+	}()
+	var body io.Reader = &countReader{r: resp.Body, n: &got}
 	var n int64
 	if report == nil {
-		n, err = io.Copy(tmp, resp.Body)
+		n, err = io.Copy(tmp, body)
 	} else {
 		report(0, res.Size)
-		n, err = io.Copy(tmp, &progressReader{r: resp.Body, total: res.Size, report: report})
+		n, err = io.Copy(tmp, &progressReader{r: body, total: res.Size, report: report})
 	}
 	if err != nil {
-		return "", fmt.Errorf("netease: download body: %w", err)
+		if stalled.Load() {
+			return "", fmt.Errorf("%w after %d bytes from %s", ErrStalled, n, req.URL.Host)
+		}
+		return "", fmt.Errorf("netease: download body from %s: %w", req.URL.Host, err)
 	}
 	if res.Size > 0 && n != res.Size {
 		return "", fmt.Errorf("netease: short download: %d of %d bytes", n, res.Size)
@@ -282,6 +324,18 @@ func (c *Client) DownloadedBytes() int64 {
 }
 
 // progressReader reports every ~512 kB so the UI moves without flooding.
+// countReader adds every byte read to n, for the stall watchdog.
+type countReader struct {
+	r io.Reader
+	n *atomic.Int64
+}
+
+func (c *countReader) Read(b []byte) (int, error) {
+	k, err := c.r.Read(b)
+	c.n.Add(int64(k))
+	return k, err
+}
+
 type progressReader struct {
 	r      io.Reader
 	done   int64
