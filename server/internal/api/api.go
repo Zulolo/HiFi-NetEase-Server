@@ -94,6 +94,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 
 	m.HandleFunc("GET /api/v1/library", g(s.getLibrary))
 	m.HandleFunc("GET /api/v1/library/search", g(s.searchLibrary))
+	m.HandleFunc("GET /api/v1/library/stats", g(s.libraryStats))
 
 	m.HandleFunc("GET /api/v1/outputs", g(s.getOutputs))
 	m.HandleFunc("PUT /api/v1/outputs/{id}/active", g(s.setActiveOutput))
@@ -160,6 +161,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		"active_output": active,
 		"format":        st.Format,
 		"ws_clients":    s.hub.count(),
+		"disk":          s.diskInfo(),
 	})
 }
 
@@ -327,4 +329,9 @@ func (s *Server) Broadcast(subsystem string) {
 	}
 	b, _ := json.Marshal(payload)
 	s.hub.broadcast(b)
+}
+
+func (s *Server) diskInfo() map[string]any {
+	total, free, _ := diskUsage(s.cfg.Paths.Music)
+	return map[string]any{"path": s.cfg.Paths.Music, "total": total, "free": free, "used": total - free}
 }

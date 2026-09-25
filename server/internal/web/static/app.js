@@ -229,7 +229,7 @@ let queuedIDs = new Set();
 function renderDownloads(s) {
   if (!s) { dlLine.textContent = ""; return; }
   queuedIDs = new Set((s.pending || []).map((i) => i.id));
-  const bits = [`${s.total_on_disk} on disk`];
+  const bits = [`${s.total_on_disk} on disk` + (s.on_disk_bytes ? ` (${fmtBytes(s.on_disk_bytes)})` : "")];
   if (s.current) bits.push(`downloading: ${s.current}`);
   if (s.pending && s.pending.length) bits.push(`${s.pending.length} queued`);
   if (s.failed && s.failed.length) bits.push(`${s.failed.length} failed`);
@@ -266,6 +266,7 @@ function setMode(m) {
   tabNcm.classList.toggle("on", m === "ncm");
   tabLib.classList.toggle("on", m === "lib");
   libSearch.hidden = m !== "lib";
+  if (m !== "lib") libSummary.hidden = true;
   dlBtn.hidden = true;
   if (m === "ncm") { libSearch.value = ""; showPlaylists(); }
   else { libPath = ""; showLibrary(""); }
@@ -282,6 +283,15 @@ function libRow(e) {
   txt.innerHTML = `<div class="n">${isDir ? "📁 " : ""}${isDir ? e.name : e.title}</div>`
     + `<div class="s">${sub}</div>`;
   li.appendChild(txt);
+  if (!isDir) {
+    const m = document.createElement("div");
+    m.className = "meta";
+    const codec = (e.path.split(".").pop() || "").toUpperCase();
+    const line2 = [codec, fmtMpdFormat(e.format), e.duration ? mmss(e.duration) : "", kbps(e.size, e.duration)]
+      .filter(Boolean).join(" · ");
+    m.innerHTML = "<b>" + fmtBytes(e.size) + "</b>" + (line2 ? "<br>" + line2 : "");
+    li.appendChild(m);
+  }
   li.onclick = async () => {
     if (isDir) { showLibrary(e.path); return; }
     setStatus(`loading "${e.title}"…`);
@@ -303,7 +313,11 @@ async function showLibrary(p) {
   if (!r) { setStatus("library unavailable"); return; }
   bBack.hidden = r.at_root;
   bBack.onclick = () => (r.at_root ? setMode("lib") : showLibrary(r.parent));
-  setStatus(`${r.items.length} item(s)`);
+  const files = r.items.filter((e) => e.type === "file");
+  const bytes = files.reduce((a, e) => a + (e.size || 0), 0);
+  const secs = files.reduce((a, e) => a + (e.duration || 0), 0);
+  setStatus(`${r.items.length} item(s)` + (files.length ? ` · ${files.length} file(s) · ${fmtBytes(bytes)} · ${mmss(secs)}` : ""));
+  refreshLibSummary();
   r.items.forEach((e) => bList.appendChild(libRow(e)));
 }
 
@@ -315,7 +329,7 @@ async function runLibSearch(q) {
   if (!r) { setStatus("search failed"); return; }
   bBack.hidden = false;
   bBack.onclick = () => showLibrary(libPath);
-  setStatus(`${r.items.length} result(s)`);
+  setStatus(`${r.items.length} result(s) · ${fmtBytes(r.items.reduce((a, e) => a + (e.size || 0), 0))}`);
   r.items.forEach((e) => bList.appendChild(libRow(e)));
 }
 
@@ -380,3 +394,40 @@ fetch(API + "/netease/status")
   .then((r) => r.json())
   .then((s) => { if (!(s && s.logged_in)) showLoginPanel(); })
   .catch(() => showLoginPanel("NetEase unavailable."));
+
+// ---- sizes and storage ---------------------------------------------------------
+const fmtBytes = (n) => {
+  if (!n && n !== 0) return "";
+  const u = ["B", "kB", "MB", "GB", "TB"]; let i = 0; let v = n;
+  while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+  return (i === 0 ? v : v.toFixed(v >= 100 ? 0 : 1)) + " " + u[i];
+};
+// "192000:24:2" -> "24/192k"; "dsd256:2" -> "DSD256"
+const fmtMpdFormat = (f) => {
+  if (!f) return "";
+  const p = f.split(":");
+  if (p[0].startsWith("dsd")) return p[0].toUpperCase();
+  const khz = (+p[0] / 1000).toFixed(1).replace(/\.0$/, "");
+  return (p[1] && p[1] !== "f" ? p[1] + "/" : "") + khz + "k";
+};
+const kbps = (size, dur) => (size && dur ? Math.round((size * 8) / dur / 1000) + " kbps" : "");
+
+const libSummary = $("lib-summary");
+async function refreshLibSummary() {
+  if (mode !== "lib") { libSummary.hidden = true; return; }
+  const s = await call("/library/stats", "GET");
+  if (!s) { libSummary.hidden = true; return; }
+  const t = s.trees || {};
+  const parts = [`${s.songs || 0} tracks`];
+  const onDisk = (t.netease?.bytes || 0) + (t.local?.bytes || 0);
+  parts.push(`${fmtBytes(onDisk)} on disk (downloads ${fmtBytes(t.netease?.bytes || 0)}, uploads ${fmtBytes(t.local?.bytes || 0)})`);
+  if (s.disk && s.disk.total) parts.push(`${fmtBytes(s.disk.free)} free of ${fmtBytes(s.disk.total)}`);
+  libSummary.textContent = parts.join(" · ");
+  libSummary.hidden = false;
+}
+setInterval(refreshLibSummary, 30000);
+
+// ---- volume fine-tuning: ±1 % steps via the API's delta form -------------------
+const nudge = async (d) => render(await call("/player/volume", "PUT", { delta: d }));
+$("vol-down").onclick = () => nudge(-1);
+$("vol-up").onclick = () => nudge(+1);

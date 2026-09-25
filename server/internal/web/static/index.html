@@ -47,6 +47,12 @@
   .tab { flex:0 0 auto; min-width:0; padding:6px 14px; font-size:13px; background:#20262c; color:var(--mut); border-radius:999px; }
   .tab.on { background:#2f3b46; color:var(--fg); }
   #lib-search { width:100%; padding:10px; margin-bottom:8px; border:0; border-radius:10px; background:#242a30; color:var(--fg); font-size:15px; }
+  .list .meta { flex:0 0 auto; text-align:right; color:var(--mut); font-size:12px; line-height:1.35; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .list .meta b { color:var(--fg); font-weight:500; }
+  #lib-summary { margin:-2px 0 8px; }
+  .volrow { display:flex; align-items:center; gap:10px; }
+  .volrow input { flex:1 1 auto; }
+  .volrow .act { min-width:44px; font-size:18px; padding:6px 0; }
 </style>
 </head>
 <body>
@@ -69,7 +75,11 @@
 
 <div class="card">
   <div class="sub">Volume <span id="volval"></span></div>
-  <input id="vol" type="range" min="0" max="100" value="0">
+  <div class="volrow">
+    <button class="act" id="vol-down" aria-label="Volume down 1%">−</button>
+    <input id="vol" type="range" min="0" max="100" value="0">
+    <button class="act" id="vol-up" aria-label="Volume up 1%">+</button>
+  </div>
 </div>
 
 <div class="card">
@@ -87,6 +97,7 @@
   </div>
   <div class="sub" id="browse-title" style="margin-bottom:6px"></div>
   <input id="lib-search" placeholder="Search library…" hidden>
+  <div class="sub" id="lib-summary" hidden></div>
   <div class="syncbar">
     <div class="sub" id="dl-status"></div>
     <button class="act" id="dl-playlist" hidden>Download all</button>

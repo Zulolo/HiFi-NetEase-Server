@@ -47,6 +47,7 @@ type QueueStatus struct {
 	Current     string `json:"current,omitempty"`
 	Done        int    `json:"done"`
 	TotalOnDisk int    `json:"total_on_disk"`
+	OnDiskBytes int64  `json:"on_disk_bytes"`
 	LastError   string `json:"last_error,omitempty"`
 }
 
@@ -138,6 +139,7 @@ func (q *Queue) Status() QueueStatus {
 		Current:     q.current,
 		Done:        q.done,
 		TotalOnDisk: q.c.Downloaded(),
+		OnDiskBytes: q.c.DownloadedBytes(),
 		LastError:   q.lastErr,
 	}
 }

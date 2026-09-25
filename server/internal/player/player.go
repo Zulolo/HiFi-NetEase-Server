@@ -429,6 +429,19 @@ type Entry struct {
 	Artist   string  `json:"artist,omitempty"`
 	Album    string  `json:"album,omitempty"`
 	Duration float64 `json:"duration,omitempty"`
+	// Size is filled in by the API layer from the file on disk; MPD does not report it.
+	Size int64 `json:"size,omitempty"`
+	// Format is MPD's "rate:bits:channels" for the file, when the database knows it.
+	Format string `json:"format,omitempty"`
+}
+
+// tag reads a key however gompd spelled it: ListInfo lowercases every key,
+// while Search, Find and PlaylistInfo keep MPD's original capitalisation.
+func tag(a mpd.Attrs, key string) string {
+	if v, ok := a[key]; ok {
+		return v
+	}
+	return a[strings.ToLower(key)]
 }
 
 func entryFrom(a mpd.Attrs) (Entry, bool) {
@@ -443,10 +456,11 @@ func entryFrom(a mpd.Attrs) (Entry, bool) {
 		Type:     "file",
 		Path:     f,
 		Name:     path.Base(f),
-		Title:    a["Title"],
-		Artist:   a["Artist"],
-		Album:    a["Album"],
-		Duration: atof(a["duration"]),
+		Title:    tag(a, "Title"),
+		Artist:   tag(a, "Artist"),
+		Album:    tag(a, "Album"),
+		Duration: atof(tag(a, "duration")),
+		Format:   tag(a, "Format"),
 	}
 	if e.Title == "" {
 		e.Title = e.Name
@@ -496,6 +510,22 @@ func (p *Player) SearchLibrary(query string, limit int) ([]Entry, error) {
 					break
 				}
 			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// Stats returns MPD's database counters (songs, albums, artists, db_playtime …).
+func (p *Player) Stats() (map[string]string, error) {
+	out := map[string]string{}
+	err := p.with(func(c *mpd.Client) error {
+		a, err := c.Stats()
+		if err != nil {
+			return err
+		}
+		for k, v := range a {
+			out[k] = v
 		}
 		return nil
 	})

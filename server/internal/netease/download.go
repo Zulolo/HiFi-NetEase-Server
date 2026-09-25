@@ -23,6 +23,9 @@ type index struct {
 	mu   sync.RWMutex
 	// Songs maps the song id to a path relative to the music directory.
 	Songs map[string]string `json:"songs"`
+
+	bytes   int64     // cached total of the files above
+	bytesAt time.Time // when bytes was computed
 }
 
 func openIndex(path string) (*index, error) {
@@ -228,4 +231,25 @@ func tagInto(ctx context.Context, src, dst string, t Track, level string) error 
 		return fmt.Errorf("ffmpeg: %v: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// DownloadedBytes sums the size of every indexed file still present. Cached
+// for a minute; the index is small but this is polled by the UI.
+func (c *Client) DownloadedBytes() int64 {
+	if c.idx == nil || c.musicDir == "" {
+		return 0
+	}
+	c.idx.mu.Lock()
+	defer c.idx.mu.Unlock()
+	if time.Since(c.idx.bytesAt) < time.Minute {
+		return c.idx.bytes
+	}
+	var total int64
+	for _, rel := range c.idx.Songs {
+		if fi, err := os.Stat(filepath.Join(c.musicDir, rel)); err == nil {
+			total += fi.Size()
+		}
+	}
+	c.idx.bytes, c.idx.bytesAt = total, time.Now()
+	return total
 }
