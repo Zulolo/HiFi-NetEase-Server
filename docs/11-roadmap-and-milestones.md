@@ -87,10 +87,16 @@ streams live at a lower ladder, and reads ahead 8 MB in the proxy. A paced synce
 subscribed playlists on disk. Verified: the downloaded master plays as `S24_3LE @ 192000` with
 zero underruns, where the same track streamed live produced repeated xruns.
 
-Remaining for M2: QR login inside `hifid` (the library exposes `QrcodeCreateKey` /
-`QrcodeGenerate` / `QrcodeCheck`; the session is currently seeded from an `ncmctl` login),
-search and daily recommendations, cloud disk, playlist export to `playlists/NetEase/*.m3u`,
-the download pipeline with tagging, and the offline sync scheduler of docs/08 §7.1.
+QR login inside `hifid` landed on 2026-09-25 (FR-1.1): `POST /netease/login/qr` returns a
+key and a PNG rendered by the server, the PWA shows it and polls
+`GET /netease/login/qr/{key}` (801 waiting → 802 scanned → 803 confirmed), and the library's
+cookie jar persists the session within its 3 s sync. Verified by deleting the seeded
+`ncmctl` cookie, logging in fresh from the phone, restarting `hifid` and finding the session
+intact, then streaming a track on it. Nothing but the session cookie ever reaches the server.
+
+Still open in M2, none of it blocking daily use: search and daily recommendations, cloud
+disk, and playlist export to `playlists/NetEase/*.m3u` for plain MPD clients. The download
+pipeline and the explicit download list replaced the offline sync scheduler (§7.1 above).
 
 1. NetEase adapter (ADR-0002 library), QR login, session persistence.
 2. Stream proxy `/stream/ncm/{id}` with redirect mode, URL cache, `addtagid` metadata.

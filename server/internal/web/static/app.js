@@ -147,6 +147,7 @@ async function showPlaylists() {
     setStatus("NetEase unavailable — check the session on the server.");
     return;
   }
+  hideLoginPanel();
   setStatus(`${r.items.length} playlists`);
   r.items.forEach((p) => {
     const li = document.createElement("li");
@@ -327,3 +328,55 @@ libSearch.oninput = (e) => {
 
 tabNcm.onclick = () => setMode("ncm");
 tabLib.onclick = () => setMode("lib");
+
+// ---- QR login -----------------------------------------------------------------
+// The phone app scans a code rendered by the server; nothing but the session
+// cookie ever reaches hifid (FR-1.1).
+const loginPanel = $("login-panel");
+const loginMsg = $("login-msg");
+const loginBtn = $("login-btn");
+const loginQr = $("login-qr");
+let loginPoll = null;
+
+function showLoginPanel(msg) {
+  loginPanel.hidden = false;
+  loginMsg.textContent = msg || "Not logged in to NetEase.";
+  loginBtn.hidden = false;
+  loginQr.hidden = true;
+  bList.innerHTML = "";
+  setStatus("");
+}
+
+function hideLoginPanel() {
+  loginPanel.hidden = true;
+  clearInterval(loginPoll);
+  loginPoll = null;
+}
+
+loginBtn.onclick = async () => {
+  loginBtn.hidden = true;
+  loginMsg.textContent = "starting…";
+  const r = await call("/netease/login/qr", "POST", {});
+  if (!r || !r.key) { showLoginPanel("Could not start login. Is the server online?"); return; }
+  loginQr.src = r.image + "?t=" + Date.now();
+  loginQr.hidden = false;
+  loginMsg.textContent = "Scan with the NetEase Cloud Music app, then confirm on the phone.";
+  clearInterval(loginPoll);
+  loginPoll = setInterval(async () => {
+    const st = await call(`/netease/login/qr/${r.key}`, "GET");
+    if (!st) return;
+    if (st.status === "scanned") loginMsg.textContent = "Scanned — confirm on your phone.";
+    else if (st.status === "expired") { showLoginPanel("Code expired. Try again."); }
+    else if (st.status === "ok") {
+      hideLoginPanel();
+      setStatus("logged in");
+      showPlaylists();
+    }
+  }, 2000);
+};
+
+// Replace the boot-time status check: show the login panel instead of a dead end.
+fetch(API + "/netease/status")
+  .then((r) => r.json())
+  .then((s) => { if (!(s && s.logged_in)) showLoginPanel(); })
+  .catch(() => showLoginPanel("NetEase unavailable."));

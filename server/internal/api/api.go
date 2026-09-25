@@ -99,6 +99,9 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("PUT /api/v1/outputs/{id}/active", g(s.setActiveOutput))
 
 	m.HandleFunc("GET /api/v1/netease/status", g(s.ncmStatus))
+	m.HandleFunc("POST /api/v1/netease/login/qr", g(s.ncmLoginStart))
+	m.HandleFunc("GET /api/v1/netease/login/qr/{key}", g(s.ncmLoginStatus))
+	m.HandleFunc("GET /api/v1/netease/login/qr/{key}/image", s.ncmLoginImage)
 	m.HandleFunc("GET /api/v1/netease/playlists", g(s.ncmPlaylists))
 	m.HandleFunc("GET /api/v1/netease/playlists/{id}/tracks", g(s.ncmPlaylistTracks))
 	m.HandleFunc("POST /api/v1/netease/download", g(s.ncmDownload))

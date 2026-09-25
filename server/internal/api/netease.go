@@ -173,3 +173,53 @@ func (s *Server) ncmDownloadsClear(w http.ResponseWriter, r *http.Request) {
 	s.dl.Clear()
 	writeJSON(w, http.StatusOK, s.dl.Status())
 }
+
+// ---- QR login (FR-1.1) ------------------------------------------------------
+
+func (s *Server) ncmLoginStart(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	key, _, err := s.ncm.StartQRLogin(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"key":        key,
+		"image":      "/api/v1/netease/login/qr/" + key + "/image",
+		"expires_in": 300,
+	})
+}
+
+func (s *Server) ncmLoginImage(w http.ResponseWriter, r *http.Request) {
+	if s.ncm == nil {
+		http.Error(w, "NetEase support is disabled", http.StatusServiceUnavailable)
+		return
+	}
+	png, ok := s.ncm.QRImage(r.PathValue("key"))
+	if !ok {
+		http.Error(w, "unknown or expired login code", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(png)
+}
+
+func (s *Server) ncmLoginStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	st, err := s.ncm.CheckQRLogin(r.Context(), r.PathValue("key"))
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	if st.Status == "ok" && s.log != nil {
+		if p, perr := s.ncm.Profile(r.Context()); perr == nil {
+			s.log.Info("netease login via QR", "nickname", p.Nickname, "vip_type", p.VipType)
+		}
+	}
+	writeJSON(w, http.StatusOK, st)
+}

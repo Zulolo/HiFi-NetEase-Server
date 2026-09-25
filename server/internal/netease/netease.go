@@ -48,6 +48,7 @@ type Client struct {
 	mu      sync.RWMutex
 	urls    map[int64]cachedURL
 	profile *Profile
+	qr      map[string]qrSession
 }
 
 type cachedURL struct {
@@ -131,7 +132,9 @@ func New(cfg Config) (*Client, error) {
 		HomeDir: cfg.StateDir,
 		Cookie: cookie.Config{
 			Filepath: filepath.Join(cfg.StateDir, "cookie.json"),
-			Interval: time.Minute,
+			// 3 s (the library default) keeps a fresh QR login durable almost
+			// immediately; a longer interval risks losing it on a quick restart.
+			Interval: 3 * time.Second,
 		},
 	}, nil)
 	if err != nil {
