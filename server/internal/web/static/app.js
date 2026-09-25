@@ -288,16 +288,27 @@ function setMode(m) {
   else showDownloads();
 }
 
+// The two roots are both "on disk"; what differs is where the music came from.
+// Directory names on disk stay local/ and netease/ (the Samba share, installer,
+// download index and docs all refer to them); only the display changes.
+const ROOTS = {
+  local:   { name: "Uploads",           sub: "copied from your PC over Samba",  icon: "💻" },
+  netease: { name: "NetEase downloads", sub: "fetched from your download list", icon: "☁️" },
+};
+const fileIcon = (p) => (/\.(dsf|dff)$/i.test(p) ? "◉" : "🎵");
+
 function libRow(e) {
   const li = document.createElement("li");
   const isDir = e.type === "directory";
-  const sub = isDir ? "folder"
+  const root = isDir ? ROOTS[e.path] : null;
+  const name = isDir ? (root ? root.name : e.name) : e.title;
+  const sub = isDir ? (root ? root.sub : "folder")
     : [e.artist, e.album].filter(Boolean).join(" — ") || e.path.replace(/\/[^/]*$/, "");
-  li.innerHTML = `<img alt="">`;
+  const icon = isDir ? (root ? root.icon : "📁") : fileIcon(e.path);
+  li.innerHTML = `<div class="ico">${icon}</div>`;
   const txt = document.createElement("div");
   txt.className = "txt";
-  txt.innerHTML = `<div class="n">${isDir ? "📁 " : ""}${isDir ? e.name : e.title}</div>`
-    + `<div class="s">${sub}</div>`;
+  txt.innerHTML = `<div class="n">${name}</div><div class="s">${sub}</div>`;
   li.appendChild(txt);
   if (!isDir) {
     const m = document.createElement("div");
@@ -323,7 +334,9 @@ function libRow(e) {
 
 async function showLibrary(p) {
   libPath = p;
-  bTitle.textContent = p ? "/" + p : "All music on disk";
+  bTitle.textContent = p
+    ? p.split("/").map((seg, i) => (i === 0 && ROOTS[seg] ? ROOTS[seg].name : seg)).join(" / ")
+    : "All music on disk";
   setStatus("loading…");
   bList.innerHTML = "";
   const r = await call("/library?path=" + encodeURIComponent(p), "GET");
