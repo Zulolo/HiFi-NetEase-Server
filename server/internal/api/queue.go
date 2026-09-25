@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -149,33 +150,62 @@ func (s *Server) addNCMPlaylist(r *http.Request, idText string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("bad playlist id %q", idText)
 	}
+	// A previous expansion still running would race this one for the queue.
+	s.expandMu.Lock()
+	if s.expandCancel != nil {
+		s.expandCancel()
+	}
+	bg, cancel := context.WithCancel(context.Background())
+	s.expandCancel = cancel
+	s.expandMu.Unlock()
+
+	// First page synchronously, so playback starts within a couple of
+	// seconds; the rest continues detached from the request, because a
+	// browser that gives up on a long request must not leave half a playlist.
+	const page = 100
 	first := -1
-	for offset := 0; ; {
-		tracks, total, err := s.ncm.PlaylistTracks(r.Context(), plID, offset, 200)
-		if err != nil {
-			return first, err
-		}
-		if len(tracks) == 0 {
-			break
-		}
-		for _, t := range tracks {
-			qid, err := s.addTrack(t)
-			if err != nil {
-				continue // one unplayable track must not abort the album
-			}
-			if first < 0 {
-				first = qid
-			}
-		}
-		offset += len(tracks)
-		if offset >= total {
-			break
+	tracks, total, err := s.ncm.PlaylistTracks(r.Context(), plID, 0, page)
+	if err != nil {
+		return 0, err
+	}
+	for _, t := range tracks {
+		if qid, err := s.addTrack(t); err == nil && first < 0 {
+			first = qid
 		}
 	}
 	if first < 0 {
 		return 0, fmt.Errorf("playlist %d: nothing could be queued", plID)
 	}
+	if total > len(tracks) {
+		go s.expandRest(bg, plID, len(tracks), total, page)
+	}
 	return first, nil
+}
+
+// expandRest appends the remaining pages of a playlist to the queue.
+func (s *Server) expandRest(ctx context.Context, plID int64, offset, total, page int) {
+	added := 0
+	for offset < total && ctx.Err() == nil {
+		tracks, _, err := s.ncm.PlaylistTracks(ctx, plID, offset, page)
+		if err != nil || len(tracks) == 0 {
+			if err != nil && s.log != nil {
+				s.log.Warn("playlist expansion stopped", "playlist", plID, "offset", offset, "err", err)
+			}
+			return
+		}
+		for _, t := range tracks {
+			if ctx.Err() != nil {
+				return
+			}
+			if _, err := s.addTrack(t); err == nil {
+				added++
+			}
+		}
+		offset += len(tracks)
+	}
+	if s.log != nil {
+		s.log.Info("playlist expanded", "playlist", plID, "added_in_background", added, "total", total)
+	}
 }
 
 // addTrack applies the local-first rule using metadata already in hand.

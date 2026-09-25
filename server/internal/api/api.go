@@ -2,12 +2,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
@@ -23,6 +25,10 @@ type Server struct {
 	version string
 	ncm     *netease.Client
 	dl      *netease.Queue
+
+	// one playlist expansion at a time; a new one cancels the previous
+	expandMu     sync.Mutex
+	expandCancel context.CancelFunc
 
 	hub *hub
 }
@@ -136,6 +142,7 @@ func (s *Server) respondState(w http.ResponseWriter) {
 		writeErr(w, http.StatusBadGateway, "mpd_unavailable", err.Error())
 		return
 	}
+	s.enrichSong(&st)
 	writeJSON(w, http.StatusOK, st)
 }
 
@@ -325,6 +332,7 @@ func (s *Server) Broadcast(subsystem string) {
 	st, err := s.pl.Status()
 	payload := map[string]any{"type": subsystem}
 	if err == nil {
+		s.enrichSong(&st)
 		payload["state"] = st
 	}
 	b, _ := json.Marshal(payload)
@@ -334,4 +342,18 @@ func (s *Server) Broadcast(subsystem string) {
 func (s *Server) diskInfo() map[string]any {
 	total, free, _ := diskUsage(s.cfg.Paths.Music)
 	return map[string]any{"path": s.cfg.Paths.Music, "total": total, "free": free, "used": total - free}
+}
+
+// enrichSong adds the NetEase id to a song playing from a downloaded file, so
+// the UI can mark the current track inside a NetEase list. Streams already
+// carry the id in their proxy URL.
+func (s *Server) enrichSong(st *player.Status) {
+	if s.ncm == nil || st.Song == nil || st.Song.NcmID != 0 {
+		return
+	}
+	if rel, ok := strings.CutPrefix(st.Song.Ref, "local:"); ok {
+		if id, found := s.ncm.IDForPath(rel); found {
+			st.Song.NcmID = id
+		}
+	}
 }

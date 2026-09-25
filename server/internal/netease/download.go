@@ -26,6 +26,10 @@ type index struct {
 
 	bytes   int64     // cached total of the files above
 	bytesAt time.Time // when bytes was computed
+
+	gen        uint64           // bumped on every put, so caches can notice
+	reverse    map[string]int64 // path -> id, rebuilt when gen moves
+	reverseGen uint64
 }
 
 func openIndex(path string) (*index, error) {
@@ -57,6 +61,7 @@ func (ix *index) get(id int64) (string, bool) {
 func (ix *index) put(id int64, rel string) error {
 	ix.mu.Lock()
 	ix.Songs[strconv.FormatInt(id, 10)] = rel
+	ix.gen++
 	b, err := json.MarshalIndent(ix, "", " ")
 	ix.mu.Unlock()
 	if err != nil {
@@ -286,4 +291,26 @@ func (p *progressReader) Read(b []byte) (int, error) {
 		p.report(p.done, p.total)
 	}
 	return n, err
+}
+
+// IDForPath answers "which NetEase song is this downloaded file?" for a path
+// relative to the music directory. The reverse map is rebuilt lazily whenever
+// the index has changed since it was last built.
+func (c *Client) IDForPath(rel string) (int64, bool) {
+	if c.idx == nil {
+		return 0, false
+	}
+	c.idx.mu.Lock()
+	defer c.idx.mu.Unlock()
+	if c.idx.reverse == nil || c.idx.reverseGen != c.idx.gen {
+		c.idx.reverse = make(map[string]int64, len(c.idx.Songs))
+		for id, p := range c.idx.Songs {
+			if n, err := strconv.ParseInt(id, 10, 64); err == nil {
+				c.idx.reverse[p] = n
+			}
+		}
+		c.idx.reverseGen = c.idx.gen
+	}
+	id, ok := c.idx.reverse[rel]
+	return id, ok
 }

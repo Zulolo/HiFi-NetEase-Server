@@ -27,14 +27,13 @@ func New(network, addr string) *Player {
 	return &Player{network: network, addr: addr}
 }
 
-// conn returns a live client, redialling when the socket has gone away.
+// conn returns the current client, dialling if there is none. It does not
+// ping first: a ping per command doubled the round trips when queueing
+// thousands of tracks. A dead socket is detected by the command failing, and
+// with() then redials once and retries.
 func (p *Player) conn() (*mpd.Client, error) {
 	if p.cl != nil {
-		if err := p.cl.Ping(); err == nil {
-			return p.cl, nil
-		}
-		_ = p.cl.Close()
-		p.cl = nil
+		return p.cl, nil
 	}
 	cl, err := mpd.Dial(p.network, p.addr)
 	if err != nil {
@@ -44,21 +43,34 @@ func (p *Player) conn() (*mpd.Client, error) {
 	return cl, nil
 }
 
+func (p *Player) drop() {
+	if p.cl != nil {
+		_ = p.cl.Close()
+		p.cl = nil
+	}
+}
+
 func (p *Player) with(fn func(*mpd.Client) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	cl, err := p.conn()
-	if err != nil {
-		return err
-	}
-	if err := fn(cl); err != nil {
-		// A failed command may mean a dropped connection: discard it so the
-		// next call redials instead of reusing a broken socket.
-		if p.cl != nil {
-			_ = p.cl.Close()
-			p.cl = nil
+	for attempt := 0; attempt < 2; attempt++ {
+		cl, err := p.conn()
+		if err != nil {
+			return err
 		}
-		return err
+		err = fn(cl)
+		if err == nil {
+			return nil
+		}
+		// MPD's own errors (e.g. "No such song") come back as *mpd.CommandError
+		// and the connection is fine; anything else is treated as a dead socket.
+		if _, isCmd := err.(mpd.Error); isCmd {
+			return err
+		}
+		p.drop()
+		if attempt == 1 {
+			return err
+		}
 	}
 	return nil
 }
@@ -90,6 +102,9 @@ type Song struct {
 	Artist   string  `json:"artist"`
 	Album    string  `json:"album"`
 	Duration float64 `json:"duration"`
+	// NcmID is the NetEase song id when known: parsed from a proxy stream URL
+	// here, or reverse-mapped from a downloaded file's path by the API layer.
+	NcmID int64 `json:"ncm_id,omitempty"`
 }
 
 type Status struct {
@@ -130,6 +145,9 @@ func songFrom(a mpd.Attrs) *Song {
 	}
 	if strings.HasPrefix(file, "http://") || strings.HasPrefix(file, "https://") {
 		s.Source, s.Ref = "stream", file
+		if i := strings.Index(file, "/stream/ncm/"); i >= 0 {
+			s.NcmID, _ = strconv.ParseInt(strings.TrimRight(file[i+len("/stream/ncm/"):], "/"), 10, 64)
+		}
 	}
 	if s.Title == "" {
 		s.Title = filepath.Base(file)

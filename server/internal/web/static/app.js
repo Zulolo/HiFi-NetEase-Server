@@ -52,6 +52,7 @@ function render(st) {
     $("vol").value = st.volume;
     $("volval").textContent = st.volume + "%";
   }
+  markPlaying(st);
 }
 
 async function refresh() {
@@ -155,6 +156,18 @@ async function showPlaylists() {
     const li = document.createElement("li");
     li.innerHTML = `${img(p.cover)}<div class="txt"><div class="n">${p.liked ? "★ " : ""}${p.name}</div><div class="s">${p.track_count} tracks</div></div>`;
     li.onclick = () => showTracks(p.id, p.name);
+    const play = document.createElement("button");
+    play.className = "act";
+    play.textContent = "▶";
+    play.title = `play all ${p.track_count} tracks`;
+    play.onclick = async (e) => {
+      e.stopPropagation();
+      play.textContent = "…";
+      const st = await call("/queue", "POST", { items: [{ ref: "ncm:playlist:" + p.id }], mode: "replace", play: true });
+      play.textContent = "▶";
+      if (st) render(st);
+    };
+    li.appendChild(play);
     bList.appendChild(li);
   });
 }
@@ -205,6 +218,7 @@ async function showTracks(id, name) {
       refreshDownloads();
     };
     li.appendChild(dl);
+    li.dataset.ncm = t.id;
 
     txt.onclick = async () => {
       // play from this track onward, like tapping a song inside an album
@@ -216,6 +230,7 @@ async function showTracks(id, name) {
     };
     bList.appendChild(li);
   });
+  refresh(); // mark the playing row straight away
 }
 
 
@@ -310,6 +325,7 @@ function libRow(e) {
   txt.className = "txt";
   txt.innerHTML = `<div class="n">${name}</div><div class="s">${sub}</div>`;
   li.appendChild(txt);
+  if (!isDir) li.dataset.path = e.path;
   if (!isDir) {
     const m = document.createElement("div");
     m.className = "meta";
@@ -367,6 +383,7 @@ async function runLibSearch(q) {
   currentEntries = r.items;
   setPlayAll(null);
   r.items.forEach((e) => bList.appendChild(libRow(e)));
+  refresh();
 }
 
 let searchTimer = null;
@@ -532,3 +549,22 @@ async function showDownloads() {
 }
 $("dl-clear").onclick = async () => renderDlPanel(await call("/netease/downloads", "DELETE"));
 tabDl.onclick = () => setMode("dl");
+
+// ---- now-playing marker in lists ------------------------------------------------
+// A NetEase row matches by song id (streams carry it in the URL, downloads are
+// reverse-mapped by the server); a Library row matches by path.
+let lastPlayingKey = "";
+function markPlaying(st) {
+  const song = st && st.state !== "stop" ? st.song : null;
+  const id = song && song.ncm_id ? String(song.ncm_id) : "";
+  const path = song && song.ref && song.ref.startsWith("local:") ? song.ref.slice(6) : "";
+  let hit = null;
+  bList.querySelectorAll("li").forEach((li) => {
+    const on = (id && li.dataset.ncm === id) || (path && li.dataset.path === path);
+    li.classList.toggle("playing", !!on);
+    if (on) hit = li;
+  });
+  const key = hit ? (id || path) : "";
+  if (hit && key !== lastPlayingKey) hit.scrollIntoView({ block: "nearest" });
+  lastPlayingKey = key;
+}

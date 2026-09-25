@@ -54,6 +54,9 @@
   .meta-row { display:flex; justify-content:space-between; align-items:center; color:var(--mut); font-size:12px; margin:6px 0 10px; }
   #play-all { padding:6px 12px; font-size:13px; }
   .list .meta.err { color:#d9534f; }
+  .list li.playing { background:#1e2a36; box-shadow: inset 3px 0 0 var(--acc); }
+  .list li.playing .n { color:var(--acc); }
+  .list li.playing .n::before { content:"▶ "; font-size:12px; }
   .volrow { display:flex; align-items:center; gap:10px; }
   .volrow input { flex:1 1 auto; }
   .volrow .act { min-width:44px; font-size:18px; padding:6px 0; }
