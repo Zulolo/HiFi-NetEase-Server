@@ -1,12 +1,13 @@
-# User Manual · HiFi-NetEase-Server playback layer
+# User Manual · HiFi-NetEase-Server
 
-This manual covers what exists today: a bit-perfect MPD-based music server on a small Debian
-board with USB DAC dongles, phone control through any MPD client, and music import over a
-Samba share. The NetEase Cloud Music service (`hifid`) and the phone web app are the next
-milestones (docs/11) and will get their own chapters.
+How to build and run the server: a bit-perfect MPD-based player on a small Debian board with
+USB DAC dongles, the `hifid` service with its phone web app (NetEase Cloud Music login,
+playlists, live streaming, download list, local library), control through any MPD client as
+well, and music import over a Samba share.
 
-Everything here is generic. The hardware named in examples is one tested configuration; any
-Debian-based SBC and any USB Audio Class 2 DAC should behave the same way.
+Everything here is generic. The hardware named in examples (Orange Pi Zero 3, an ES9039Q2M
+dongle) is one tested configuration; any Debian-based SBC and any USB Audio Class 2 DAC should
+behave the same way, and the installer detects what is attached rather than assuming a model.
 
 ## 1. What you need
 
@@ -63,6 +64,24 @@ Variants:
 The installer prints a summary at the end: MPD version and outputs, the Samba path and where
 its password is stored (`/etc/hifi/samba.txt`), and how to connect from the phone. Every step
 is a separate script you can re-run alone (`setup-disk.sh`, `dac-setup.sh`, `gen-mpd-conf.sh`).
+
+### 3.1 Install the hifid service (NetEase + phone app)
+
+`hifid` is a single static Go binary. Build it on the board (Go 1.24+, `apt install golang`
+or the tarball from go.dev) or cross-compile on your PC, then install:
+
+```
+cd server && go build -trimpath -o dist/hifid ./cmd/hifid && cd ..
+# from a PC instead: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o dist/hifid ./cmd/hifid   (riscv64 likewise)
+sudo deploy/scripts/install-hifid.sh --binary server/dist/hifid
+```
+
+This creates the unprivileged `hifid` user, `/etc/hifid/config.yaml`, a random API token in
+`/etc/hifid/env`, the polkit rule for the power-off button, and enables `hifid.service` on
+port 80. Re-running keeps an existing config and token. `--listen 0.0.0.0:8080` picks another
+port. Then open `http://<hostname>.local/` on the phone and log in to NetEase with the QR code
+(section 5.0). Nothing about your account is typed on the server; only the session cookie is
+stored, readable by the `hifid` user alone.
 
 ## 4. Verify the audio path
 

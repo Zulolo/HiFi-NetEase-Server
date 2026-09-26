@@ -224,7 +224,7 @@ Filesystem layout on the USB disk:
 
 ## 11. As built (2026-09-25): how hifid, MPD and NetEase work together
 
-Everything below is what runs on `HiFi-Server.local` today (Orange Pi Zero 3, 2 GB, Debian 12,
+Everything below is what runs on the reference board today (Orange Pi Zero 3, 2 GB, Debian 12,
 MPD 0.24, `hifid` 0.14). It is written to be read before a soak test: which process does what,
 what talks to what, and where state lives.
 
@@ -233,7 +233,7 @@ what talks to what, and where state lives.
 ```mermaid
 flowchart LR
     subgraph Phone["Phone / PC browser"]
-        PWA["PWA at http://HiFi-Server.local/<br/>(embedded in hifid)"]
+        PWA["PWA at http://&lt;hostname&gt;.local/<br/>(embedded in hifid)"]
         MALP["myMPD :8080 / M.A.L.P.<br/>(optional, MPD protocol)"]
     end
     subgraph Board["Orange Pi Zero 3"]
@@ -285,7 +285,7 @@ Three rules make the whole thing simple:
 | `hifid.service` | `hifid` (audio) | 80 | REST/WS API, PWA, NetEase adapter, stream proxy, download worker, board stats |
 | `mympd.service` | dynamic | 8080 / 8443 | optional full MPD web client, same queue |
 | `smbd` | | 445 | share `music` = `/srv/music` (Explorer, Y: drive) |
-| `avahi-daemon` | | 5353/udp | `HiFi-Server.local` |
+| `avahi-daemon` | | 5353/udp | `<hostname>.local` |
 | `wifi-watchdog.timer` | root | | reconnects wlan0 if the gateway stops answering |
 
 hifid runs under `NoNewPrivileges` + `ProtectSystem=strict`; it can write only `/srv/music`,

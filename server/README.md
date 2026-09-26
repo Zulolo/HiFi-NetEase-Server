@@ -3,17 +3,21 @@
 The single custom service of the project: one static binary running next to MPD
 (ADR-0001 — MPD owns playback, `hifid` never touches samples).
 
-## Status · M1 skeleton (v0.1.0-m1)
+## Status · daily-use complete (0.15, September 2026)
 
-Implemented and verified on the Orange Pi Zero 3:
+Verified on an Orange Pi Zero 3 (arm64, Debian 12); nothing in it is board-specific.
 
-| Area | Endpoints |
+| Area | Endpoints (all under `/api/v1`) |
 |---|---|
-| System | `GET /api/v1/system/status` |
-| Player | `GET /player`, `POST /player/play\|pause\|stop\|next\|prev\|seek`, `PUT /player/volume\|options` |
-| Queue | `GET /queue`, `DELETE /queue`, `DELETE /queue/{qid}` |
+| System | `GET /system/status`, `GET /system/stats` (CPU/RAM/temperature/Wi-Fi), `POST /system/poweroff` |
+| Player | `GET /player`, `POST /player/play\|pause\|stop\|next\|prev\|seek\|jump`, `PUT /player/volume\|options` |
+| Queue | `GET /queue`, `POST /queue` (refs `ncm:<id>`, `ncm:playlist:<id>`, `local:<path>`), `DELETE /queue[/{qid}]` |
 | Outputs | `GET /outputs`, `PUT /outputs/{id}/active` |
-| Events | `GET /api/v1/ws` (MPD idle fan-out) |
+| Library | `GET /library?path=`, `/library/search`, `/library/stats`, `/library/tags?tag=artist\|album`, `/library/find` |
+| NetEase | QR login, `GET /netease/playlists[/{id}/tracks]`, `/netease/search`, `/netease/daily`, `POST /netease/playlists/{id}/export` |
+| Downloads | `POST /netease/download[/playlist]`, `GET\|DELETE /netease/downloads`, `POST …/pause\|resume\|retag` |
+| Stream | `GET /stream/ncm/{id}` (loopback, token-free; what MPD fetches) |
+| Events | `GET /ws` (MPD idle fan-out) |
 | UI | mobile PWA embedded with `go:embed`, served at `/` |
 
 `format.delivery` is reported from MPD's `audio` field cross-checked against
@@ -21,9 +25,9 @@ Implemented and verified on the Orange Pi Zero 3:
 receives (FR-4.6). Verified: a DSD256 file reports
 `native-dsd, 11289600, DSD_U32_BE @ 352800`, matching the kernel exactly.
 
-Not yet implemented: the NetEase adapter and its stream proxy (M2, and note
-ADR-0008 — the proxy must pipe bytes and correct `Content-Type`), the library
-and upload modules, discovery, and per-DAC capability probing.
+Not implemented (by choice, see docs/11): browser upload (Samba is the import path),
+UDP discovery (mDNS suffices), and per-DAC capability probing / `mpd.conf` generation
+inside hifid (the installer's shell scripts do it; deferred until a second DAC is in use).
 
 ## Layout
 
@@ -32,12 +36,13 @@ server/
 ├── cmd/hifid/            main package: flags, wiring, graceful shutdown
 └── internal/
     ├── config/           YAML config with defaults matching install.sh
-    ├── player/           MPD adapter: status, transport, queue, outputs, idle watcher
-    ├── api/              REST handlers + WebSocket hub
-    └── web/              embedded PWA (go:embed static/)
+    ├── player/           MPD adapter: status, transport, queue, outputs, idle watcher, library browse/list/find
+    ├── netease/          session (cookie jar), catalogue, search, daily, quality ladders, stream proxy (pipe mode),
+    │                     download + tagging, explicit download list (queue.go), playlist export
+    ├── sysinfo/          /proc and /sys sampling for the header strip (Linux build tag, stub elsewhere)
+    ├── api/              REST handlers + WebSocket hub, auth, disk stats
+    └── web/              embedded PWA (go:embed static/), ETag-versioned
 ```
-
-Planned packages (docs/03): `netease/`, `library/`, `upload/`, `discovery/`.
 
 ## Build
 
