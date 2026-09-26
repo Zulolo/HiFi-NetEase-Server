@@ -14,7 +14,7 @@ Debian-based SBC and any USB Audio Class 2 DAC should behave the same way.
 |---|---|---|
 | Board | Debian-based Linux (Debian 12/13, Armbian, Raspberry Pi OS, vendor images), ≥ 512 MB RAM, one free USB host port | Tested: Orange Pi Zero 3 (2 GB, Debian 12 vendor image, kernel 6.1). Raspberry Pi 3/4/5, Orange Pi 3/5, Radxa boards work the same |
 | Network | Ethernet, or Wi-Fi with a stable driver | On Wi-Fi the installer enables a link watchdog and disables power saving |
-| Music storage | USB flash drive or SSD, or a second microSD in a USB reader; will be formatted ext4 | The OS card is not used for music |
+| Music storage | USB flash drive or SSD, or a second microSD in a USB reader; will be formatted ext4 | The OS card is not used for music. Plug it into the board's **own** USB-A port, not a header/expansion-board port: on the Zero 3 a card reader on the expansion header fell back to USB 1.1 (12 Mbit/s, 0.9 MB/s) and everything felt slow. `lsusb -t` must show the Mass Storage line at **480M** |
 | DAC | Any USB Audio Class 2 dongle or DAC | Native DSD depends on the USB bridge chip; DoP works on every DoP-capable DAC; PCM always works |
 | Amplifier / speaker | Any analog line input (3.5 mm or RCA) | The DAC's headphone output drives line inputs fine at 100 % volume |
 | Phone | Any phone with a browser (myMPD web client on the board), or an MPD client app | M.A.L.P. for Android via F-Droid (the Play Store hides it on Android 14+), or a desktop client like Cantata |
@@ -222,7 +222,7 @@ If a DAC misbehaves with the quirk (mis-clocked playback), remove
 |---|---|
 | No sound, `mpc outputs` shows the DAC | `sudo journalctl -u mpd -n 30`; if it says "Failed to open ALSA device", the card name changed: `cat /proc/asound/cards`, then `sudo ./dac-setup.sh && sudo ./gen-mpd-conf.sh && sudo systemctl restart mpd` |
 | MPD not running after boot | `systemctl status mpd srv-music.mount`; the music disk must be mounted first (label `hifi`) |
-| Clicks or dropouts | `dmesg | grep -i xrun`; on Wi-Fi check `iw dev wlan0 get power_save` (must be off); keep the disk and DAC on different USB ports if the board has them |
+| Clicks or dropouts | `dmesg | grep -i xrun`; on Wi-Fi check `iw dev wlan0 get power_save` (must be off); keep the disk and DAC on different USB ports if the board has them; if the Mass Storage device shows `12M` in `lsusb -t`, move it to the board's own USB-A port |
 | Phone cannot find the server | use the IP instead of `.local`; make sure the phone is on the same network and the router does not isolate clients |
 | "Windows can't find \\board\music" | Port 445 is open but Windows connected as your own account and got no access. Connect as `hifi`: `net use \\board-ip\music /user:hifi <password>` (password in `/etc/hifi/samba.txt`); verify from the board with `testparm -s` that `[music]` exists |
 | Samba asks for a password again and again | `sudo smbpasswd -a hifi` to set a new one, or use `\\ip\music` with the user `hifi` |

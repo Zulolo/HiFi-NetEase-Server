@@ -135,6 +135,10 @@ itself: the TF-card reader (Genesys 05e3:0764, USB 2.0) enumerated at **12 Mbit/
 on the expansion-header port ("not running at top speed" in dmesg): 0.9 MB/s read and write.
 That also caps Samba uploads at ~1.5 MB/s and is marginal for 24/192 playback while a download
 writes. Fix is physical: move the reader to the board's own USB-A port (controller 5200000, empty).
+Done by the owner the same morning: the reader enumerates at 480 Mbit/s on 5200000; clean
+benchmark 29 MB/s write, 35 MB/s read (was 0.9/0.9), downloads run at ~3 MB/s and the pause
+after 100 % is gone. Lesson for docs/05 and the manual: put the music disk on the board's own
+USB-A port, keep the expansion-header ports for the DAC; check `lsusb -t` shows 480M.
 
 The download list gained pause/resume the same day: the flag is persisted with the list, so
 a paused board stays paused across reboots; pausing cancels the transfer in flight (partial
