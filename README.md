@@ -12,7 +12,7 @@ Go.
 
 | Phone | Desktop browser |
 |---|---|
-| ![Phone view of the web app](docs/images/pwa-phone.jpg) | ![Desktop view, Downloads tab](docs/images/pwa-desktop-downloads.png) |
+| ![Phone view of the web app](docs/images/pwa-phone.png) | ![Desktop view, Downloads tab](docs/images/pwa-desktop-downloads.png) |
 
 ## What it does
 
