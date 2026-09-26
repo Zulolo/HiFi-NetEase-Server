@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -297,4 +298,18 @@ func (s *Server) ncmExportPlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"file": file, "tracks": n})
+}
+
+// ncmRetag answers POST /api/v1/netease/downloads/retag by tagging, in the
+// background, every downloaded FLAC that has no TITLE tag, then rescanning.
+func (s *Server) ncmRetag(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	go s.ncm.RetagMissing(context.Background(), s.log, func(fixed int) {
+		if fixed > 0 {
+			_ = s.pl.Update("netease")
+		}
+	})
+	writeJSON(w, http.StatusAccepted, map[string]any{"started": true})
 }

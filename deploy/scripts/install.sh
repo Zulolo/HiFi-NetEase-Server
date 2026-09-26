@@ -41,7 +41,7 @@ if [ "$CODENAME" = bookworm ]; then
 else
   $APT install mpd mpc
 fi
-$APT install alsa-utils ffmpeg avahi-daemon inotify-tools f3 usbutils curl
+$APT install alsa-utils ffmpeg flac avahi-daemon inotify-tools f3 usbutils curl
 if [ $SAMBA -eq 1 ]; then
   # some vendor images already carry backports samba-libs; then plain samba conflicts -> take all of samba from backports
   $APT install samba || { [ "$CODENAME" = bookworm ] && $APT install -t bookworm-backports samba; } || die "samba installation failed"

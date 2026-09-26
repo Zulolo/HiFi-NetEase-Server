@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -263,7 +264,8 @@ func (c *Client) DownloadWithProgress(ctx context.Context, id int64, report Prog
 
 	abs := filepath.Join(c.musicDir, rel)
 	if err := tagInto(ctx, tmpName, abs, meta, res.Level); err != nil {
-		// tagging is a nicety; keep the audio even when ffmpeg is unhappy
+		// tagging is a nicety; keep the audio even when the tagger is unhappy
+		slog.Warn("download: tagging failed, keeping untagged file", "song", id, "path", rel, "err", err)
 		if err2 := os.Rename(tmpName, abs); err2 != nil {
 			return "", fmt.Errorf("netease: finalize: %w", err2)
 		}
@@ -285,11 +287,24 @@ func firstArtist(s string) string {
 // tagInto copies the stream without re-encoding and writes the tags, so the
 // audio stays bit-identical to what NetEase served (docs/08 §7).
 func tagInto(ctx context.Context, src, dst string, t Track, level string) error {
+	comment := "NetEase " + level + " (ncm:" + strconv.FormatInt(t.ID, 10) + ")"
+	// FLAC: write the Vorbis comment in place with metaflac. NetEase's files
+	// carry a padding block, so this touches a few kB instead of rewriting
+	// 100–200 MB on the USB card (which used to overrun the ffmpeg limit right
+	// after the download had just flushed the same amount to that card).
+	if strings.EqualFold(filepath.Ext(src), ".flac") {
+		if mf, err := exec.LookPath("metaflac"); err == nil {
+			if err := metaflacTag(ctx, mf, src, t.Title, t.Artist, t.Album, comment); err != nil {
+				return err
+			}
+			return os.Rename(src, dst)
+		}
+	}
 	ff, err := exec.LookPath("ffmpeg")
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	args := []string{
 		"-hide_banner", "-loglevel", "error", "-y",
@@ -298,7 +313,7 @@ func tagInto(ctx context.Context, src, dst string, t Track, level string) error 
 		"-metadata", "title=" + t.Title,
 		"-metadata", "artist=" + t.Artist,
 		"-metadata", "album=" + t.Album,
-		"-metadata", "comment=NetEase " + level + " (ncm:" + strconv.FormatInt(t.ID, 10) + ")",
+		"-metadata", "comment=" + comment,
 		dst,
 	}
 	cmd := exec.CommandContext(ctx, ff, args...)
@@ -307,6 +322,72 @@ func tagInto(ctx context.Context, src, dst string, t Track, level string) error 
 		return fmt.Errorf("ffmpeg: %v: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// metaflacTag sets the four tags in place (padding permitting; metaflac
+// rewrites the file itself only when it has to).
+func metaflacTag(ctx context.Context, mf, path, title, artist, album, comment string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	args := []string{
+		"--preserve-modtime",
+		"--remove-tag=TITLE", "--remove-tag=ARTIST", "--remove-tag=ALBUM", "--remove-tag=COMMENT",
+		"--set-tag=TITLE=" + title, "--set-tag=ARTIST=" + artist, "--set-tag=ALBUM=" + album,
+		"--set-tag=COMMENT=" + comment,
+		path,
+	}
+	if out, err := exec.CommandContext(ctx, mf, args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("metaflac: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// RetagMissing walks the download index and tags every FLAC that has no
+// TITLE (the files saved while ffmpeg tagging was timing out). It asks
+// NetEase for each track's names, paced, and reports how many it fixed.
+// done is called at the end so the caller can trigger an MPD rescan.
+func (c *Client) RetagMissing(ctx context.Context, log *slog.Logger, done func(fixed int)) {
+	mf, err := exec.LookPath("metaflac")
+	if err != nil || c.idx == nil {
+		done(0)
+		return
+	}
+	c.idx.mu.RLock()
+	songs := make(map[int64]string, len(c.idx.Songs))
+	for k, v := range c.idx.Songs {
+		if id, err := strconv.ParseInt(k, 10, 64); err == nil {
+			songs[id] = v
+		}
+	}
+	c.idx.mu.RUnlock()
+	fixed := 0
+	for id, rel := range songs {
+		if ctx.Err() != nil {
+			break
+		}
+		if !strings.EqualFold(filepath.Ext(rel), ".flac") {
+			continue
+		}
+		abs := filepath.Join(c.musicDir, rel)
+		out, err := exec.CommandContext(ctx, mf, "--show-tag=TITLE", abs).Output()
+		if err != nil || strings.TrimSpace(string(out)) != "" {
+			continue // missing file, or already tagged
+		}
+		meta, err := c.TrackInfo(ctx, id)
+		if err != nil {
+			log.Warn("retag: track info", "song", id, "err", err)
+			continue
+		}
+		level := "download"
+		if err := metaflacTag(ctx, mf, abs, meta.Title, meta.Artist, meta.Album, "NetEase "+level+" (ncm:"+strconv.FormatInt(id, 10)+")"); err != nil {
+			log.Warn("retag failed", "song", id, "path", rel, "err", err)
+			continue
+		}
+		fixed++
+		time.Sleep(300 * time.Millisecond) // pace the SongDetail calls
+	}
+	log.Info("retag done", "fixed", fixed)
+	done(fixed)
 }
 
 // DownloadedBytes sums the size of every indexed file still present. Cached

@@ -122,6 +122,20 @@ deadline that counts as a stall only when it really timed out, and every failure
 with its cause. The ⏻ button was used for real in this sequence and shut the board down
 cleanly (journal: "power off requested" → "shutting down").
 
+2026-09-26, "slow after 100 %" and three failed tracks. The three are songs NetEase answers 404
+for (removed from the catalogue); they sit in the failed list by design. The slowness was the
+tagging step: `ffmpeg -c copy` rewrote every 100–200 MB FLAC on the music disk right after the
+download had flushed the same amount there, overran its 2 min limit, was killed, and the raw
+untagged file was kept, so **every downloaded FLAC lacked title/artist tags** (MP3s, being
+small, were fine). Now FLACs are tagged in place with `metaflac` (NetEase files carry a padding
+block, so it is a 17 ms header write; `flac` added to the package list), ffmpeg stays for other
+formats with a 10 min limit, tagging failures are logged, and `POST /netease/downloads/retag`
+fixes existing untagged FLACs (130 repaired on the board). Root cause of the disk slowness
+itself: the TF-card reader (Genesys 05e3:0764, USB 2.0) enumerated at **12 Mbit/s full speed**
+on the expansion-header port ("not running at top speed" in dmesg): 0.9 MB/s read and write.
+That also caps Samba uploads at ~1.5 MB/s and is marginal for 24/192 playback while a download
+writes. Fix is physical: move the reader to the board's own USB-A port (controller 5200000, empty).
+
 The download list gained pause/resume the same day: the flag is persisted with the list, so
 a paused board stays paused across reboots; pausing cancels the transfer in flight (partial
 file discarded) and puts that track back at the head, and Clear list still drops everything
