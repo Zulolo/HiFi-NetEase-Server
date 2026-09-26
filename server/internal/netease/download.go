@@ -329,8 +329,9 @@ func tagInto(ctx context.Context, src, dst string, t Track, level string) error 
 func metaflacTag(ctx context.Context, mf, path, title, artist, album, comment string) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	// no --preserve-modtime: MPD's incremental update decides by mtime, so a
+	// retag must bump it or the database keeps the old (empty) tags.
 	args := []string{
-		"--preserve-modtime",
 		"--remove-tag=TITLE", "--remove-tag=ARTIST", "--remove-tag=ALBUM", "--remove-tag=COMMENT",
 		"--set-tag=TITLE=" + title, "--set-tag=ARTIST=" + artist, "--set-tag=ALBUM=" + album,
 		"--set-tag=COMMENT=" + comment,
