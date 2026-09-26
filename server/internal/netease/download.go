@@ -292,7 +292,7 @@ func tagInto(ctx context.Context, src, dst string, t Track, level string) error 
 	// carry a padding block, so this touches a few kB instead of rewriting
 	// 100–200 MB on the USB card (which used to overrun the ffmpeg limit right
 	// after the download had just flushed the same amount to that card).
-	if strings.EqualFold(filepath.Ext(src), ".flac") {
+	if strings.EqualFold(filepath.Ext(dst), ".flac") { // src is the extension-less temp file
 		if mf, err := exec.LookPath("metaflac"); err == nil {
 			if err := metaflacTag(ctx, mf, src, t.Title, t.Artist, t.Album, comment); err != nil {
 				return err
