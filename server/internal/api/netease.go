@@ -313,3 +313,22 @@ func (s *Server) ncmRetag(w http.ResponseWriter, r *http.Request) {
 	})
 	writeJSON(w, http.StatusAccepted, map[string]any{"started": true})
 }
+
+// ncmProbe answers GET /api/v1/netease/probe/{id}: the account's privileges
+// for one song and NetEase's raw answer per quality level. Diagnostic only.
+func (s *Server) ncmProbe(w http.ResponseWriter, r *http.Request) {
+	if !s.ncmReady(w) {
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "song id must be numeric")
+		return
+	}
+	p, err := s.ncm.Probe(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "ncm_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
