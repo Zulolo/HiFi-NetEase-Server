@@ -320,22 +320,32 @@ async function refreshDownloads() {
   renderDownloads(await call("/netease/downloads", "GET"));
 }
 
+// Runs fn with the button showing "…". The label is fixed, a tap while busy is
+// ignored, and the label comes back even when the request throws: saving and
+// restoring textContent let a second tap store "…" as the label for good.
+async function busy(btn, label, fn) {
+  if (btn.dataset.busy) return undefined;
+  btn.dataset.busy = "1";
+  btn.textContent = "…";
+  try {
+    return await fn();
+  } finally {
+    delete btn.dataset.busy;
+    btn.textContent = label;
+  }
+}
+
 plExport.onclick = async () => {
   if (viewingPlaylist === null) return;
-  const label = plExport.textContent;
-  plExport.textContent = "…";
-  const r = await call("/netease/playlists/" + viewingPlaylist + "/export", "POST", { name: bTitle.textContent });
-  plExport.textContent = label;
+  const r = await busy(plExport, "Export to MPD", () => call("/netease/playlists/" + viewingPlaylist + "/export", "POST", { name: bTitle.textContent }));
+  if (r === undefined) return;
   if (r && r.file) setStatus(r.tracks + " tracks written to playlists/" + r.file + " (load it from any MPD client)");
   else setStatus("export failed");
 };
 
 dlBtn.onclick = async () => {
   if (viewingPlaylist === null) return;
-  const label = dlBtn.textContent;
-  dlBtn.textContent = "…";
-  const r = await call("/netease/download/playlist", "POST", { playlist_id: viewingPlaylist });
-  dlBtn.textContent = label;
+  const r = await busy(dlBtn, "Download all", () => call("/netease/download/playlist", "POST", { playlist_id: viewingPlaylist }));
   if (r) await refreshDownloads();
 };
 
@@ -616,10 +626,7 @@ function setPlayAll(fn) {
 }
 playAllBtn.onclick = async () => {
   if (!playAllAction) return;
-  const label = playAllBtn.textContent;
-  playAllBtn.textContent = "…";
-  const st = await playAllAction();
-  playAllBtn.textContent = label;
+  const st = await busy(playAllBtn, "▶ Play all", () => playAllAction());
   if (st) render(st);
 };
 
