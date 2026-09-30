@@ -9,6 +9,7 @@
 <style>
   :root { color-scheme: dark; --bg:#101214; --card:#191d21; --fg:#eef1f4; --mut:#98a2ac; --acc:#4da3ff; }
   * { box-sizing:border-box; }
+  html, body { overflow-x:hidden; }
   body { margin:0; padding:16px; background:var(--bg); color:var(--fg);
          font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   h1 { font-size:17px; margin:0; font-weight:600; letter-spacing:.2px; }
@@ -17,7 +18,7 @@
   .pwr:hover { color:#e46; }
   .seek { padding:8px 0 4px; margin:2px 0 0; cursor:pointer; }
   .seek .bar { margin:0; }
-  .opts .act { flex:1 1 0; padding:9px 10px; }
+  .opts .act { flex:1 1 0; padding:9px 10px; font-size:14px; }
   .opts .act.on { color:var(--acc); background:#1f3242; }
   .sys { display:flex; flex-wrap:wrap; gap:6px; font-variant-numeric:tabular-nums; }
   .tile { flex:0 0 auto; background:var(--card); border-radius:8px; padding:5px 9px 4px; display:grid;
@@ -44,7 +45,15 @@
     .top { display:block; }
     .top h1 { margin-bottom:10px; }
     .sys { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .tile { width:auto; }
+    /* grid items default to min-width:auto, which let the pre-formatted text push the
+       page wider than a 360 px phone; let tiles shrink and clip instead */
+    .tile { width:auto; min-width:0; overflow:hidden; }
+    .tile .s, .tile .v { overflow:hidden; }
+  }
+  @media (max-width: 400px) {
+    .tile { padding:5px 7px 4px; }
+    .spark, .bar2 { width:48px; }
+    .tile .v { font-size:13px; }
   }
   .card { background:var(--card); border-radius:12px; padding:14px; margin-bottom:12px; }
   .title { font-size:19px; font-weight:600; margin-bottom:2px; word-break:break-word; }
@@ -73,32 +82,44 @@
   .list .txt { min-width:0; flex:1 1 auto; }
   .list .n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .list .s { color:var(--mut); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .hdr { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
-  .hdr button { flex:0 0 auto; min-width:0; padding:6px 12px; font-size:13px; }
-  .act { flex:0 0 auto; background:#2a323a; border:0; color:var(--fg); border-radius:8px; padding:8px 10px; font-size:13px; cursor:pointer; }
+  .hdr { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+  .hdr .acts { display:flex; gap:6px; margin-left:auto; }
+  .act { flex:0 0 auto; background:#2a323a; border:0; color:var(--fg); border-radius:8px; padding:7px 12px; font-size:13px; line-height:18px; cursor:pointer; white-space:nowrap; }
   .act.done { color:#54c06e; background:transparent; }
   .act.busy { color:var(--acc); }
-  .syncbar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-  .syncbar .sub { flex:1 1 auto; }
+  .syncbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .syncbar .sub { flex:1 1 220px; min-width:0; }
+  .syncbar .acts { display:flex; gap:6px; margin-left:auto; }
   .tabs { display:flex; gap:6px; }
-  .tab { flex:0 0 auto; min-width:0; padding:6px 14px; font-size:13px; background:#20262c; color:var(--mut); border-radius:999px; }
+  .tab { flex:0 0 auto; min-width:0; padding:7px 14px; font-size:13px; line-height:18px; background:#20262c; color:var(--mut); border-radius:999px; }
   .tab.on { background:#2f3b46; color:var(--fg); }
   #lib-search, #ncm-search { width:100%; padding:10px; margin-bottom:8px; border:0; border-radius:10px; background:#242a30; color:var(--fg); font-size:15px; }
   .list .meta { flex:0 0 auto; text-align:right; color:var(--mut); font-size:12px; line-height:1.35; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .list .meta b { color:var(--fg); font-weight:500; }
   #lib-summary { margin:-2px 0 8px; }
   .meta-row { display:flex; justify-content:space-between; align-items:center; color:var(--mut); font-size:12px; margin:6px 0 10px; }
-  #play-all { padding:6px 12px; font-size:13px; }
+  .ic { width:18px; height:18px; vertical-align:-4px; }
+  .row > button > .ic { width:22px; height:22px; vertical-align:-5px; }
   .list .meta.err { color:#d9534f; }
   .list li.playing { background:#1e2a36; box-shadow: inset 3px 0 0 var(--acc); }
   .list li.playing .n { color:var(--acc); }
   .list li.playing .n::before { content:"▶ "; font-size:12px; }
   .volrow { display:flex; align-items:center; gap:10px; }
   .volrow input { flex:1 1 auto; }
-  .volrow .act { min-width:44px; font-size:18px; padding:6px 0; }
+  .volrow .act { min-width:44px; font-size:18px; padding:5px 0; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-prev" viewBox="0 0 24 24"><path fill="currentColor" d="M6 5h2v14H6zM20 5v14L9 12z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M6 5h4v14H6zM14 5h4v14h-4z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6h12v12H6z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M16 5h2v14h-2zM4 5v14l11-7z"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></g></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></g></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></g></symbol>
+</svg>
 <div class="top">
   <h1><span id="dot" class="dot"></span><span id="server">HiFi Server</span> <button class="act pwr" id="poweroff" title="Power off the board" aria-label="Power off"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></button></h1>
   <div class="sys" id="sys" title="board status, refreshed every 3 s"></div>
@@ -113,14 +134,14 @@
 </div>
 
 <div class="card row">
-  <button id="prev" aria-label="Previous">⏮</button>
-  <button id="playpause" aria-label="Play">▶</button>
-  <button id="stop" aria-label="Stop">⏹</button>
-  <button id="next" aria-label="Next">⏭</button>
+  <button id="prev" aria-label="Previous"><svg class="ic"><use href="#i-prev"/></svg></button>
+  <button id="playpause" aria-label="Play"><svg class="ic"><use href="#i-play"/></svg></button>
+  <button id="stop" aria-label="Stop"><svg class="ic"><use href="#i-stop"/></svg></button>
+  <button id="next" aria-label="Next"><svg class="ic"><use href="#i-next"/></svg></button>
 </div>
 <div class="card row opts">
-  <button class="act" id="repeat" aria-pressed="false">🔁 Repeat</button>
-  <button class="act" id="random" aria-pressed="false">🔀 Shuffle</button>
+  <button class="act" id="repeat" aria-pressed="false"><svg class="ic"><use href="#i-repeat"/></svg> Repeat</button>
+  <button class="act" id="random" aria-pressed="false"><svg class="ic"><use href="#i-shuffle"/></svg> Shuffle</button>
 </div>
 
 <div class="card">
@@ -144,9 +165,9 @@
       <button class="tab" id="tab-lib">Library</button>
       <button class="tab" id="tab-dl">Downloads</button>
     </div>
-    <div class="row" style="flex:0 0 auto;gap:6px">
-      <button class="act" id="play-all" hidden>▶ Play all</button>
-      <button id="browse-back" hidden>← Back</button>
+    <div class="acts">
+      <button class="act" id="play-all" hidden><svg class="ic"><use href="#i-play"/></svg> Play all</button>
+      <button class="act" id="browse-back" hidden><svg class="ic"><use href="#i-back"/></svg> Back</button>
     </div>
   </div>
   <div class="sub" id="browse-title" style="margin-bottom:6px"></div>
@@ -155,8 +176,10 @@
   <div class="sub" id="lib-summary" hidden></div>
   <div class="syncbar">
     <div class="sub" id="dl-status"></div>
-    <button class="act" id="pl-export" hidden title="Write this playlist as an .m3u file MPD clients can load">Export to MPD</button>
-    <button class="act" id="dl-playlist" hidden>Download all</button>
+    <div class="acts">
+      <button class="act" id="pl-export" hidden title="Write this playlist as an .m3u file MPD clients can load">Export to MPD</button>
+      <button class="act" id="dl-playlist" hidden>Download all</button>
+    </div>
   </div>
   <div id="login-panel" hidden style="text-align:center;padding:8px 0 4px">
     <div class="sub" id="login-msg">Not logged in to NetEase.</div>
@@ -167,7 +190,7 @@
   <div id="dl-panel" hidden>
     <div class="sub" id="dl-now">Nothing downloading.</div>
     <div class="bar"><i id="dl-prog"></i></div>
-    <div class="meta-row"><span id="dl-pct"></span><span style="display:flex;gap:6px"><button class="act" id="dl-pause">Pause</button><button class="act" id="dl-clear">Clear list</button></span></div>
+    <div class="meta-row"><span id="dl-pct"></span><span style="display:flex;gap:6px"><button class="act" id="dl-pause"><svg class="ic"><use href="#i-pause"/></svg> Pause</button><button class="act" id="dl-clear">Clear list</button></span></div>
   </div>
   <ul class="list" id="browse-list"></ul>
 </div>

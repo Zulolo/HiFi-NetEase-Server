@@ -32,12 +32,14 @@ function fmtLabel(f) {
   return s;
 }
 
+const ic = (n) => `<svg class="ic"><use href="#i-${n}"/></svg>`;
+
 function render(st) {
   if (!st) return;
   $("dot").className = "dot" + (st.connected ? " ok" : "");
   const playing = st.state === "play";
   const pp = $("playpause");
-  pp.textContent = playing ? "⏸" : "▶";
+  pp.innerHTML = ic(playing ? "pause" : "play");
   pp.setAttribute("aria-label", playing ? "Pause" : "Play");
   const song = st.song || {};
   $("title").textContent = song.title || "Nothing playing";
@@ -186,14 +188,14 @@ async function showPlaylists() {
     li.onclick = () => showDaily();
     const play = document.createElement("button");
     play.className = "act";
-    play.textContent = "▶";
+    play.innerHTML = ic("play");
     play.title = "play today's picks";
     play.onclick = async (e) => {
       e.stopPropagation();
       play.textContent = "…";
       const d = await call("/netease/daily", "GET");
       const st = d && d.items && d.items.length ? await call("/queue", "POST", { items: d.items.map(trackItem), mode: "replace", play: true }) : null;
-      play.textContent = "▶";
+      play.innerHTML = ic("play");
       if (st) render(st);
     };
     li.appendChild(play);
@@ -205,13 +207,13 @@ async function showPlaylists() {
     li.onclick = () => showTracks(p.id, p.name);
     const play = document.createElement("button");
     play.className = "act";
-    play.textContent = "▶";
+    play.innerHTML = ic("play");
     play.title = `play all ${p.track_count} tracks`;
     play.onclick = async (e) => {
       e.stopPropagation();
       play.textContent = "…";
       const st = await call("/queue", "POST", { items: [{ ref: "ncm:playlist:" + p.id }], mode: "replace", play: true });
-      play.textContent = "▶";
+      play.innerHTML = ic("play");
       if (st) render(st);
     };
     li.appendChild(play);
@@ -331,7 +333,7 @@ async function busy(btn, label, fn) {
     return await fn();
   } finally {
     delete btn.dataset.busy;
-    btn.textContent = label;
+    btn.innerHTML = label; // labels may carry an icon
   }
 }
 
@@ -626,7 +628,7 @@ function setPlayAll(fn) {
 }
 playAllBtn.onclick = async () => {
   if (!playAllAction) return;
-  const st = await busy(playAllBtn, "▶ Play all", () => playAllAction());
+  const st = await busy(playAllBtn, ic("play") + " Play all", () => playAllAction());
   if (st) render(st);
 };
 
@@ -659,7 +661,7 @@ function renderDlPanel(s) {
     dlProg.style.width = "0";
     dlPct.textContent = "";
   }
-  dlPause.textContent = s.paused ? "▶ Resume" : "⏸ Pause";
+  dlPause.innerHTML = s.paused ? ic("play") + " Resume" : ic("pause") + " Pause";
   dlPause.classList.toggle("busy", !!s.paused);
   bList.innerHTML = "";
   const add = (label, it, cls) => {
