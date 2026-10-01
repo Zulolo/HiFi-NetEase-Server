@@ -167,6 +167,8 @@ function setStatus(text) {
 }
 
 async function showPlaylists() {
+  trackView++;
+  bList.onscroll = null;
   viewingPlaylist = null;
   reloadTracks = null;
   setPlayAll(null);
@@ -222,6 +224,7 @@ async function showPlaylists() {
 }
 
 let reloadTracks = null;
+let trackView = 0;
 
 async function showTracks(id, name) {
   viewingPlaylist = id;
@@ -232,12 +235,15 @@ async function showTracks(id, name) {
   bBack.hidden = false;
   setStatus("loading tracks…");
   bList.innerHTML = "";
-  const r = await call(`/netease/playlists/${id}/tracks?limit=100`, "GET");
+  const view = ++trackView; // a newer page view makes this one stale
+  const PAGE = 100;
+  const r = await call(`/netease/playlists/${id}/tracks?offset=0&limit=${PAGE}`, "GET");
+  if (view !== trackView) return;
   if (!r || !r.items) {
     setStatus("could not load tracks");
     return;
   }
-  const count = () => setStatus(`${r.items.length} of ${r.total} tracks`);
+  const count = () => setStatus(`${r.items.length} of ${r.total} tracks` + (r.items.length < r.total ? " · scroll for more" : ""));
   count();
   setPlayAll(async () => {
     setStatus(`queueing all ${r.total} tracks…`);
@@ -245,7 +251,7 @@ async function showTracks(id, name) {
     count();
     return st;
   });
-  r.items.forEach((t) => {
+  const addRow = (t) => {
     const li = document.createElement("li");
     const txt = document.createElement("div");
     txt.className = "txt";
@@ -277,7 +283,31 @@ async function showTracks(id, name) {
       await playHere(li, t.ref, items, t.title, count);
     };
     bList.appendChild(li);
-  });
+  };
+  r.items.forEach(addRow);
+
+  // Load the next page when the list is scrolled near its end (or when the
+  // first page does not even fill the box). One request at a time.
+  let loading = false;
+  const more = async () => {
+    if (loading || view !== trackView || r.items.length >= r.total) return;
+    loading = true;
+    setStatus(`${r.items.length} of ${r.total} tracks · loading more…`);
+    const p = await call(`/netease/playlists/${id}/tracks?offset=${r.items.length}&limit=${PAGE}`, "GET");
+    loading = false;
+    if (view !== trackView) return;
+    if (!p || !p.items || !p.items.length) { count(); return; }
+    p.items.forEach((t) => { r.items.push(t); addRow(t); });
+    count();
+    refreshDownloads();
+    refresh();
+    fill();
+  };
+  const fill = () => { if (bList.scrollHeight <= bList.clientHeight + 40) more(); };
+  bList.onscroll = () => {
+    if (bList.scrollTop + bList.clientHeight >= bList.scrollHeight - 300) more();
+  };
+  fill();
   refresh(); // mark the playing row straight away
 }
 
@@ -424,6 +454,8 @@ function libRow(e) {
 }
 
 async function showLibrary(p) {
+  trackView++;
+  bList.onscroll = null;
   libPath = p;
   bTitle.textContent = p
     ? p.split("/").map((seg, i) => (i === 0 && ROOTS[seg] ? ROOTS[seg].name : seg)).join(" / ")
@@ -458,6 +490,8 @@ function tagRow(tag, icon, name, sub) {
 }
 
 async function showTagList(tag) {
+  trackView++;
+  bList.onscroll = null;
   const label = tag === "artist" ? "Artists" : "Albums";
   bTitle.textContent = label;
   setStatus("loading…");
@@ -676,6 +710,8 @@ function renderDlPanel(s) {
 }
 
 async function showDownloads() {
+  trackView++;
+  bList.onscroll = null;
   bTitle.textContent = "Download list";
   bBack.hidden = true;
   dlPanel.hidden = false;
@@ -822,6 +858,8 @@ const ncmSearch = $("ncm-search");
 let ncmSearchTimer = null;
 
 function renderTrackRows(items, statusText) {
+  trackView++;
+  bList.onscroll = null;
   // shared renderer for playlist pages and search results
   bList.innerHTML = "";
   const r = { items, total: items.length };
