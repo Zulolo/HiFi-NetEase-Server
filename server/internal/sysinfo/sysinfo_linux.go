@@ -33,6 +33,10 @@ type Stats struct {
 	WifiQuality int       `json:"wifi_quality,omitempty"`
 	HifidRSS    int64     `json:"hifid_rss"`
 	MPDRSS      int64     `json:"mpd_rss"`
+	// USBStorageMbit is the negotiated USB link speed of the first mass-storage
+	// device (12 = full speed, i.e. the reader failed the high-speed handshake;
+	// 480 = normal; 0 = none found). The PWA warns below 480.
+	USBStorageMbit int `json:"usb_storage_mbit"`
 }
 
 type sample struct {
@@ -57,6 +61,7 @@ func Sample(iface string) Stats {
 		return *last
 	}
 	s := Stats{SampledAt: now}
+	s.USBStorageMbit = usbStorageSpeed()
 	cur := sample{at: now}
 
 	if f := fields(readFile("/proc/uptime")); len(f) > 0 {
@@ -209,6 +214,25 @@ func rssOfComm(comm string) int64 {
 		}
 		if strings.TrimSpace(readFile("/proc/"+e.Name()+"/comm")) == comm {
 			return rssOf("/proc/" + e.Name() + "/status")
+		}
+	}
+	return 0
+}
+
+// usbStorageSpeed walks /sys/bus/usb/devices for a device with a mass-storage
+// interface (class 08) and returns its negotiated speed in Mbit/s.
+func usbStorageSpeed() int {
+	devs, _ := filepath.Glob("/sys/bus/usb/devices/[0-9]*-[0-9]*")
+	for _, d := range devs {
+		if _, err := os.Stat(filepath.Join(d, "bDeviceClass")); err != nil {
+			continue
+		}
+		ifaces, _ := filepath.Glob(filepath.Join(d, "*", "bInterfaceClass"))
+		for _, f := range ifaces {
+			if strings.TrimSpace(readFile(f)) == "08" {
+				n, _ := strconv.Atoi(strings.TrimSpace(readFile(filepath.Join(d, "speed"))))
+				return n
+			}
 		}
 	}
 	return 0

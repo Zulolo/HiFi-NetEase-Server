@@ -836,6 +836,11 @@ async function refreshSys() {
   const bars = s.wifi_dbm >= -55 ? 4 : s.wifi_dbm >= -65 ? 3 : s.wifi_dbm >= -75 ? 2 : 1;
   const sig = `<div class="sig">${[1, 2, 3, 4].map((i) => `<i class="${i <= bars ? "on" : ""}"></i>`).join("")}</div>`;
   const ramPct = (100 * s.mem_used) / s.mem_total;
+  const warn = $("warn");
+  if (s.usb_storage_mbit && s.usb_storage_mbit < 480) {
+    warn.textContent = `USB music disk is linked at ${s.usb_storage_mbit} Mbit/s (should be 480): writes crawl. The USB watchdog will re-plug it as soon as nothing is playing or downloading.`;
+    warn.hidden = false;
+  } else warn.hidden = true;
   sysEl.innerHTML = [
     tile(cpuCls, "cpu", padL(s.cpu_percent.toFixed(0), 3) + " %",
       `${padL((s.cpu_mhz / 1000).toFixed(1), 4)} GHz  ld ${s.load1.toFixed(2)}`, spark(hist.cpu, 0, 100)),

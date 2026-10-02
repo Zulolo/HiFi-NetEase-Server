@@ -135,6 +135,14 @@ itself: the TF-card reader (Genesys 05e3:0764, USB 2.0) enumerated at **12 Mbit/
 on the expansion-header port ("not running at top speed" in dmesg): 0.9 MB/s read and write.
 That also caps Samba uploads at ~1.5 MB/s and is marginal for 24/192 playback while a download
 writes. Fix is physical: move the reader to the board's own USB-A port (controller 5200000, empty).
+(Update 2026-10-02: it happened again on the native port after a power cycle, so the handshake
+is flaky at power-up, not port-specific. Power-cycling the port in software does not help;
+unbinding and re-binding the EHCI+OHCI pair does: `usb-hs-guard.service` runs that before the
+disk is mounted at boot, `usb-hs-watch.timer` checks every 5 min and re-enumerates when the
+board is idle, hifid reports `usb_storage_mbit` in `/system/stats` and the PWA shows a banner.
+Same day: the Wi-Fi driver logged `sdiohal_rx_thre: page allocation failure: order:6` before the
+board went unreachable, so `deploy/sysctl/90-hifi.conf` raises `vm.min_free_kbytes` to 128 MB and
+caps dirty pages; the watchdog also runs memory compaction.)
 Done by the owner the same morning: the reader enumerates at 480 Mbit/s on 5200000; clean
 benchmark 29 MB/s write, 35 MB/s read (was 0.9/0.9), downloads run at ~3 MB/s and the pause
 after 100 % is gone. Lesson for docs/05 and the manual: put the music disk on the board's own

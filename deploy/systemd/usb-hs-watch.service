@@ -1,0 +1,8 @@
+[Unit]
+Description=USB speed watchdog for the music disk (re-enumerate at high speed when idle)
+After=srv-hifi.mount network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/usb-hs-watch.sh
+StandardOutput=journal

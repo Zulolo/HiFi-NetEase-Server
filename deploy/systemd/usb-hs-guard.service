@@ -1,0 +1,16 @@
+[Unit]
+Description=Re-enumerate the USB music disk at high speed before mounting it
+Documentation=file:///usr/local/sbin/usb-hs-guard.sh
+DefaultDependencies=no
+After=systemd-udevd.service systemd-udev-trigger.service
+Before=local-fs-pre.target srv-hifi.mount
+ConditionPathIsDirectory=/sys/bus/platform/drivers/ehci-platform
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/usb-hs-guard.sh
+TimeoutStartSec=120
+StandardOutput=journal
+
+[Install]
+WantedBy=local-fs-pre.target

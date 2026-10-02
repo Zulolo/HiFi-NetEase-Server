@@ -92,6 +92,15 @@ fi
 cp "$DIR/../systemd/avahi-hifid.service.xml" /etc/avahi/services/hifid.service 2>/dev/null || true
 systemctl enable --now avahi-daemon >/dev/null 2>&1
 
+# USB high-speed guard + watchdog (card readers that fall back to 12 Mbit/s) and kernel tunables
+install -m 755 "$DIR/usb-hs-guard.sh" /usr/local/sbin/usb-hs-guard.sh
+install -m 755 "$DIR/usb-hs-watch.sh" /usr/local/sbin/usb-hs-watch.sh
+cp "$DIR/../systemd/usb-hs-guard.service" "$DIR/../systemd/usb-hs-watch.service" "$DIR/../systemd/usb-hs-watch.timer" /etc/systemd/system/
+install -m 644 "$DIR/../sysctl/90-hifi.conf" /etc/sysctl.d/90-hifi.conf
+sysctl -q -p /etc/sysctl.d/90-hifi.conf 2>/dev/null || true
+systemctl daemon-reload; systemctl enable usb-hs-guard.service >/dev/null 2>&1; systemctl enable --now usb-hs-watch.timer >/dev/null
+log "USB speed guard (boot) and watchdog (every 5 min) enabled; sysctl tunables installed"
+
 WIFI_IF=$(ip -4 route show default 2>/dev/null | awk '/dev wl/{print $5; exit}')
 if [ "$WATCHDOG" != 0 ] && [ -n "$WIFI_IF" ]; then
   install -m 755 "$DIR/wifi-watchdog.sh" /usr/local/bin/wifi-watchdog.sh
