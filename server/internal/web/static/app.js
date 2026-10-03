@@ -422,12 +422,24 @@ const fileIcon = (p) => (/\.(dsf|dff)$/i.test(p) ? "◉" : "🎵");
 
 // ---- SACD images: MPD cannot read inside an .iso, the server extracts DSF ----
 let extractTimer = null;
+let extractJob = null; // last job seen from the server
+// paint every image row's button from the job state: the one being extracted
+// shows its percentage, the others wait; all are disabled while a job runs
+function paintIsoButtons() {
+  const running = extractJob && extractJob.state === "running";
+  document.querySelectorAll("#browse-list button[data-iso]").forEach((b) => {
+    if (b.dataset.kind !== "extract") { b.disabled = !!running; return; }
+    b.disabled = !!running;
+    b.textContent = !running ? "Extract to DSF" : b.dataset.iso === extractJob.iso ? `Extracting… ${extractJob.percent}%` : "Waiting…";
+  });
+}
 async function pollExtract(statusFn, done) {
   clearInterval(extractTimer);
   const tick = async () => {
     const r = await call("/library/extract", "GET");
     if (!r) return;
     const j = r.job || {};
+    extractJob = j; paintIsoButtons();
     if (j.state === "running") { statusFn(`extracting ${j.iso.split("/").pop()} … ${j.percent}%`); return; }
     clearInterval(extractTimer); extractTimer = null;
     if (j.state === "done") statusFn(`extracted ${j.tracks} tracks (${fmtBytes(j.bytes)}) — the image can be deleted now`);
@@ -450,6 +462,8 @@ function isoRow(e) {
   li.appendChild(txt);
   const btn = document.createElement("button");
   btn.className = "act";
+  btn.dataset.iso = e.path;
+  btn.dataset.kind = e.extracted ? "delete" : "extract";
   li.style.cursor = "default";
   if (e.extracted) {
     btn.textContent = "Delete image";
@@ -463,10 +477,12 @@ function isoRow(e) {
     btn.textContent = "Extract to DSF";
     btn.onclick = async (ev) => {
       ev.stopPropagation();
+      if (btn.disabled) return;
       btn.disabled = true;
+      btn.textContent = "Starting…";
       const res = await fetch(API + "/library/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: e.path }) });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) { btn.disabled = false; setStatus((body.error && body.error.message) || body.message || "could not start the extraction"); return; }
+      if (!res.ok) { btn.disabled = false; btn.textContent = "Extract to DSF"; setStatus((body.error && body.error.message) || body.message || "could not start the extraction"); return; }
       pollExtract(setStatus, () => { if (mode === "lib") showLibrary(libPath); });
     };
   }
@@ -537,6 +553,7 @@ async function showLibrary(p) {
   r.items.forEach((e) => bList.appendChild(libRow(e)));
   if (r.items.some((e) => e.type === "iso")) {
     const x = await call("/library/extract", "GET");
+    if (x) { extractJob = x.job; paintIsoButtons(); }
     if (x && !x.available) setStatus("sacd_extract is not installed on the board: run deploy/scripts/install-sacd-extract.sh");
     else if (x && x.job && x.job.state === "running") pollExtract(setStatus, () => { if (mode === "lib") showLibrary(libPath); });
   }
