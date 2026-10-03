@@ -1,0 +1,10 @@
+[Unit]
+Description=Check every 5 minutes whether the preferred Wi-Fi network can be rejoined
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

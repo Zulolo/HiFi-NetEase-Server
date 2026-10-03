@@ -1,0 +1,7 @@
+[Unit]
+Description=Return to the preferred Wi-Fi network after a fallback (when the link is idle)
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/wifi-prefer.sh wlan0

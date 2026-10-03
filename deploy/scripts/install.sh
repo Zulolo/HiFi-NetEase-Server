@@ -107,7 +107,11 @@ if [ "$WATCHDOG" != 0 ] && [ -n "$WIFI_IF" ]; then
   sed "s/wlan0/$WIFI_IF/" "$DIR/../systemd/wifi-watchdog.service" > /etc/systemd/system/wifi-watchdog.service
   cp "$DIR/../systemd/wifi-watchdog.timer" /etc/systemd/system/
   iw dev "$WIFI_IF" set power_save off 2>/dev/null || true
+  install -m 755 "$DIR/wifi-prefer.sh" /usr/local/sbin/wifi-prefer.sh
+  sed "s/wlan0/$WIFI_IF/" "$DIR/../systemd/wifi-prefer.service" > /etc/systemd/system/wifi-prefer.service
+  cp "$DIR/../systemd/wifi-prefer.timer" /etc/systemd/system/
   systemctl daemon-reload; systemctl enable --now wifi-watchdog.timer >/dev/null
+  systemctl enable --now wifi-prefer.timer >/dev/null
   log "Wi-Fi watchdog enabled on $WIFI_IF (default route is wireless)"
 fi
 
