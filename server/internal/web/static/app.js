@@ -507,7 +507,7 @@ function libRow(e) {
   if (!isDir) li.dataset.path = e.path;
   if (!isDir) {
     const m = document.createElement("div");
-    m.className = "meta";
+    m.className = "meta fmeta";
     const codec = (e.path.split(".").pop() || "").toUpperCase();
     const line2 = [codec, fmtMpdFormat(e.format), e.duration ? mmss(e.duration) : "", kbps(e.size, e.duration)]
       .filter(Boolean).join(" · ");
@@ -1025,3 +1025,36 @@ ncmSearch.oninput = (e) => {
   clearTimeout(ncmSearchTimer);
   ncmSearchTimer = setTimeout(() => (q ? runNcmSearch(q) : showPlaylists()), 400);
 };
+
+// ---- scrolling titles ---------------------------------------------------------
+// A title wider than its row scrolls slowly to its end and back. Only rows that
+// are on screen are measured and animated, so a 1,400-row list stays cheap.
+(() => {
+  const setup = (li) => {
+    const n = li.querySelector(".n");
+    if (!n) return;
+    let inner = n.querySelector(".mqi");
+    if (!inner) {
+      inner = document.createElement("span");
+      inner.className = "mqi";
+      while (n.firstChild) inner.appendChild(n.firstChild);
+      n.appendChild(inner);
+    }
+    const over = inner.offsetWidth - n.clientWidth;
+    if (over > 4) {
+      n.style.setProperty("--shift", -over + "px");
+      n.style.setProperty("--dur", Math.max(4, over / 25) + "s"); // ~25 px/s
+      n.classList.add("mq");
+    } else n.classList.remove("mq");
+  };
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (en.isIntersecting) setup(en.target);
+      else { const n = en.target.querySelector(".n"); if (n) n.classList.remove("mq"); }
+    });
+  }, { root: null, rootMargin: "100px" });
+  new MutationObserver((muts) => {
+    muts.forEach((m) => m.addedNodes.forEach((x) => { if (x.nodeType === 1 && x.tagName === "LI") io.observe(x); }));
+  }).observe(bList, { childList: true });
+  window.addEventListener("resize", () => bList.querySelectorAll("li").forEach((li) => { io.unobserve(li); io.observe(li); }));
+})();

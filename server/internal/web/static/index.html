@@ -103,6 +103,20 @@
   .ic { width:18px; height:18px; vertical-align:-4px; }
   .row > button > .ic { width:22px; height:22px; vertical-align:-5px; }
   .list .meta.err { color:#d9534f; }
+  /* long titles scroll back and forth instead of being cut (set up by app.js) */
+  .list .n.mq { text-overflow:clip; }
+  .list .n .mqi { display:inline-block; }
+  .list .n.mq .mqi { animation: mq var(--dur, 8s) ease-in-out infinite alternate; }
+  @keyframes mq { 0%, 18% { transform:translateX(0); } 82%, 100% { transform:translateX(var(--shift, 0)); } }
+  @media (prefers-reduced-motion: reduce) { .list .n.mq .mqi { animation:none; } }
+  /* phones: file details go under the title so the title gets the full width */
+  @media (max-width: 640px) {
+    .list li { flex-wrap:wrap; }
+    .list li > .txt { flex:1 1 0; }
+    .list li > .fmeta { flex:1 0 100%; text-align:left; padding-left:50px; margin-top:-6px; overflow:hidden; text-overflow:ellipsis; }
+    .list li > .fmeta br { display:none; }
+    .list li > .fmeta b { margin-right:8px; }
+  }
   .list li.playing { background:#1e2a36; box-shadow: inset 3px 0 0 var(--acc); }
   .list li.playing .n { color:var(--acc); }
   .list li.playing .n::before { content:"▶ "; font-size:12px; }
