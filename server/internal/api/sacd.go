@@ -83,3 +83,41 @@ func (s *Server) isoDelete(w http.ResponseWriter, r *http.Request) {
 	s.log.Warn("iso deleted on request", "iso", p, "from", r.RemoteAddr)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": p})
 }
+
+// diskDir reports whether dir (music-relative) is a real folder inside the music tree.
+func (s *Server) diskDir(dir string) bool {
+	clean := filepath.Clean(filepath.FromSlash(dir))
+	if dir == "" || clean == "." || strings.HasPrefix(clean, "..") {
+		return false
+	}
+	fi, err := os.Stat(filepath.Join(s.cfg.Paths.Music, clean))
+	return err == nil && fi.IsDir()
+}
+
+// diskOnlyDirs returns sub-folders that exist on the disk but are missing
+// from MPD's listing because they hold nothing MPD can play yet, typically a
+// freshly uploaded folder with only a disc image in it. Without them the
+// image could not be reached to extract it.
+func (s *Server) diskOnlyDirs(dir string, have []player.Entry) []player.Entry {
+	if !s.diskDir(dir) {
+		return nil
+	}
+	known := map[string]bool{}
+	for _, e := range have {
+		if e.Type == "directory" {
+			known[e.Name] = true
+		}
+	}
+	des, err := os.ReadDir(filepath.Join(s.cfg.Paths.Music, filepath.FromSlash(dir)))
+	if err != nil {
+		return nil
+	}
+	var out []player.Entry
+	for _, de := range des {
+		if !de.IsDir() || known[de.Name()] || strings.HasPrefix(de.Name(), ".") {
+			continue
+		}
+		out = append(out, player.Entry{Type: "directory", Path: dir + "/" + de.Name(), Name: de.Name()})
+	}
+	return out
+}

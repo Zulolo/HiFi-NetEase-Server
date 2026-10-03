@@ -19,8 +19,13 @@ func (s *Server) getLibrary(w http.ResponseWriter, r *http.Request) {
 	dir := strings.Trim(r.URL.Query().Get("path"), "/")
 	entries, err := s.pl.Browse(dir)
 	if err != nil {
-		writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
-		return
+		// a folder MPD does not know (nothing playable in it yet, e.g. only a
+		// disc image) is still browsable when it exists on the disk
+		if !s.diskDir(dir) {
+			writeErr(w, http.StatusBadGateway, "mpd_error", err.Error())
+			return
+		}
+		entries = nil
 	}
 	s.enrich(entries)
 	// MPD lists a disc image as a pseudo-folder (archive plugin); it is shown
@@ -34,6 +39,7 @@ func (s *Server) getLibrary(w http.ResponseWriter, r *http.Request) {
 	}
 	entries = kept
 	if dir != "" {
+		entries = append(entries, s.diskOnlyDirs(dir, entries)...)
 		entries = append(entries, s.isoEntries(dir)...)
 	}
 	if entries == nil {
