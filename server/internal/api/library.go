@@ -23,6 +23,19 @@ func (s *Server) getLibrary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.enrich(entries)
+	// MPD lists a disc image as a pseudo-folder (archive plugin); it is shown
+	// once, as an image row with an Extract button, instead.
+	kept := entries[:0]
+	for _, e := range entries {
+		if e.Type == "directory" && strings.EqualFold(filepath.Ext(e.Path), ".iso") {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	entries = kept
+	if dir != "" {
+		entries = append(entries, s.isoEntries(dir)...)
+	}
 	if entries == nil {
 		entries = []player.Entry{}
 	}

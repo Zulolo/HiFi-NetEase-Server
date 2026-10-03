@@ -420,7 +420,62 @@ const ROOTS = {
 };
 const fileIcon = (p) => (/\.(dsf|dff)$/i.test(p) ? "◉" : "🎵");
 
+// ---- SACD images: MPD cannot read inside an .iso, the server extracts DSF ----
+let extractTimer = null;
+async function pollExtract(statusFn, done) {
+  clearInterval(extractTimer);
+  const tick = async () => {
+    const r = await call("/library/extract", "GET");
+    if (!r) return;
+    const j = r.job || {};
+    if (j.state === "running") { statusFn(`extracting ${j.iso.split("/").pop()} … ${j.percent}%`); return; }
+    clearInterval(extractTimer); extractTimer = null;
+    if (j.state === "done") statusFn(`extracted ${j.tracks} tracks (${fmtBytes(j.bytes)}) — the image can be deleted now`);
+    else if (j.state === "failed") statusFn("extraction failed: " + j.error);
+    done(j);
+  };
+  await tick();
+  if (extractTimer === null) extractTimer = setInterval(tick, 2000);
+}
+
+function isoRow(e) {
+  const li = document.createElement("li");
+  li.innerHTML = `<div class="ico">💿</div>`;
+  const txt = document.createElement("div");
+  txt.className = "txt";
+  const n = document.createElement("div"); n.className = "n"; n.textContent = e.name;
+  const s2 = document.createElement("div"); s2.className = "s";
+  s2.textContent = `disc image · ${fmtBytes(e.size)} · ${e.extracted ? "already extracted" : "not playable until extracted"}`;
+  txt.append(n, s2);
+  li.appendChild(txt);
+  const btn = document.createElement("button");
+  btn.className = "act";
+  li.style.cursor = "default";
+  if (e.extracted) {
+    btn.textContent = "Delete image";
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!confirm(`Delete ${e.name}? The extracted DSF tracks stay. This cannot be undone.`)) return;
+      const r = await call("/library/iso?path=" + encodeURIComponent(e.path), "DELETE");
+      if (r && r.deleted) showLibrary(libPath); else setStatus("could not delete the image");
+    };
+  } else {
+    btn.textContent = "Extract to DSF";
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      btn.disabled = true;
+      const res = await fetch(API + "/library/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: e.path }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { btn.disabled = false; setStatus((body.error && body.error.message) || body.message || "could not start the extraction"); return; }
+      pollExtract(setStatus, () => { if (mode === "lib") showLibrary(libPath); });
+    };
+  }
+  li.appendChild(btn);
+  return li;
+}
+
 function libRow(e) {
+  if (e.type === "iso") return isoRow(e);
   const li = document.createElement("li");
   const isDir = e.type === "directory";
   const root = isDir ? ROOTS[e.path] : null;
@@ -480,6 +535,11 @@ async function showLibrary(p) {
     bList.appendChild(tagRow("album", "💿", "Albums", "everything on disk, by album tag"));
   }
   r.items.forEach((e) => bList.appendChild(libRow(e)));
+  if (r.items.some((e) => e.type === "iso")) {
+    const x = await call("/library/extract", "GET");
+    if (x && !x.available) setStatus("sacd_extract is not installed on the board: run deploy/scripts/install-sacd-extract.sh");
+    else if (x && x.job && x.job.state === "running") pollExtract(setStatus, () => { if (mode === "lib") showLibrary(libPath); });
+  }
 }
 
 function tagRow(tag, icon, name, sub) {

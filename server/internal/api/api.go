@@ -16,6 +16,7 @@ import (
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/sacd"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/sysinfo"
 )
 
@@ -26,6 +27,7 @@ type Server struct {
 	started time.Time
 	version string
 	ncm     *netease.Client
+	sacd    *sacd.Extractor
 	dl      *netease.Queue
 
 	// one playlist expansion at a time; a new one cancels the previous
@@ -36,7 +38,23 @@ type Server struct {
 }
 
 func New(cfg *config.Config, pl *player.Player, log *slog.Logger, version string) *Server {
-	return &Server{cfg: cfg, pl: pl, log: log, started: time.Now(), version: version, hub: newHub()}
+	s := &Server{cfg: cfg, pl: pl, log: log, started: time.Now(), version: version, hub: newHub()}
+	s.sacd = sacd.New(cfg.Paths.Music, func(p string) (uint64, bool) {
+		_, free, err := diskUsage(p)
+		return free, err == nil
+	})
+	s.sacd.OnDone = func(relDir string) {
+		// rescan the top-level folder (ASCII), as for downloads
+		top := relDir
+		if i := strings.IndexByte(top, '/'); i > 0 {
+			top = top[:i]
+		}
+		if err := pl.Update(top); err != nil {
+			log.Warn("sacd: mpd update", "err", err)
+		}
+		log.Info("sacd extraction finished", "dir", relDir)
+	}
+	return s
 }
 
 type apiError struct {
@@ -107,6 +125,9 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("GET /api/v1/library/search", g(s.searchLibrary))
 	m.HandleFunc("GET /api/v1/library/stats", g(s.libraryStats))
 	m.HandleFunc("GET /api/v1/library/tags", g(s.libraryTags))
+	m.HandleFunc("GET /api/v1/library/extract", g(s.extractStatus))
+	m.HandleFunc("POST /api/v1/library/extract", g(s.extractStart))
+	m.HandleFunc("DELETE /api/v1/library/iso", g(s.isoDelete))
 	m.HandleFunc("GET /api/v1/library/find", g(s.libraryFind))
 
 	m.HandleFunc("GET /api/v1/outputs", g(s.getOutputs))

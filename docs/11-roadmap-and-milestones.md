@@ -200,6 +200,15 @@ night; go-musicfox no longer needed.
 Exit criteria: FR-3 acceptance test (4 GB DSF folder over Wi-Fi, via Samba and via the web page)
 passes.
 
+2026-10-03, uploads check and SACD images: 742 uploaded files (FLAC to 24/192, DSF DSD64–256, 5.1 DTS,
+MP3) all index and decode; DTS reaches the stereo DAC as a 2-channel 24/48 downmix (measured at the
+DAC). An SACD-R ISO was invisible to MPD, so `hifid` gained `internal/sacd`: it runs `sacd_extract
+-2 -s -c` next to the image, parses the `Total: N%` progress, verifies each DSF header against the
+file size, records the extracted tracks in a hidden marker beside the image, rescans, and exposes
+Extract / Delete image in the Library tab. The delete guard uses that marker, not "some DSF is in
+the folder" (first version did; a test caught it). MPD's archive plugin lists an `.iso` as a
+pseudo-folder; the API hides it. Full-disc extraction: 8 min 24 s, 10 tracks, 2.6 GB.
+
 ## M4 · Output manager and DSD polish · deferred
 
 Deferred 2026-09-25 until a second DAC is in use: one dongle (Comtrue XR768-9039, native DSD

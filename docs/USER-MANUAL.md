@@ -206,7 +206,17 @@ by group `audio` (the share does this automatically; for SFTP use `chmod -R g+rw
 ### 6.3 Supported formats
 
 FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, OGG Vorbis, Opus, DSF, DFF (uncompressed),
-CUE sheets. SACD ISO and DST-compressed DFF must be converted on the PC first.
+CUE sheets. DTS files (5.1) play as a stereo downmix on a stereo DAC. DST-compressed DFF must be
+converted on the PC first.
+
+**SACD disc images (.iso).** MPD cannot read inside an SACD image, so the server extracts it.
+Install the extractor once with `sudo deploy/scripts/install-sacd-extract.sh` (builds the
+open-source `sacd_extract`). Then upload the `.iso` anywhere under the share, open its folder in
+the Library tab, and tap **Extract to DSF** on the 💿 row. The stereo tracks are written as DSF
+(DST decompressed, tags from the disc text) into an album sub-folder next to the image, MPD
+indexes them, and progress shows in the status line; about 8 minutes for a full disc on a
+quad Cortex-A53. Afterwards the row offers **Delete image**, which is only allowed while every
+extracted track is present and intact. DVD-Audio and CD images are not supported.
 
 ## 7. Several DACs
 

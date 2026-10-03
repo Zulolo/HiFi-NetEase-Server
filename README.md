@@ -22,7 +22,8 @@ Go.
   your account grants (超清母带 masters at 24-bit/192 kHz on SVIP), tags them, and plays them
   from disk afterwards. Files are plain FLAC/MP3, not the desktop client's encrypted format.
 - **Plays your own music** dropped onto a Samba share from Windows Explorer or macOS Finder:
-  FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, Vorbis, Opus, DSF, DFF.
+  FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, Vorbis, Opus, DSF, DFF, DTS. SACD disc images
+  (.iso) are extracted to DSF from the web app with one tap.
 - **Bit-perfect.** MPD talks to the DAC through ALSA `hw:` with no mixer or resampler in the
   path. Native DSD where the kernel allows it, DoP otherwise, DSD-to-PCM as the last resort. The
   phone shows the format the DAC really receives ("PCM 24/192k · S24_LE", "DSD256 native").

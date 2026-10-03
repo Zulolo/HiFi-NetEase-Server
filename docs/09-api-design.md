@@ -158,6 +158,11 @@ POST   /netease/sync/run             {} -> {"job":"sync_20260914"}     start a s
 
 ## 8. Local library (FR-3.3)
 
+SACD images (2026-10-03): folder listings include `{"type":"iso","path":…,"size":…,"extracted":bool}` rows;
+`POST /library/extract {"path":"local/…/disc.iso"}` starts the one extraction slot (409 when busy, 501
+without `sacd_extract`, 507 when the disk is short), `GET /library/extract` -> `{"available":bool,"job":{state,iso,percent,tracks,bytes,error}}`,
+`DELETE /library/iso?path=` removes an image only after a recorded, intact extraction.
+
 As built (2026-09-25): `GET /library?path=` (folders, MPD `lsinfo`), `GET /library/search?q=`,
 `GET /library/stats`, `GET /library/tags?tag=artist|album` -> `{"items":[names]}`, and
 `GET /library/find?tag=&value=` -> `{"items":Entry[]}` (MPD `list` / `find`). The rest of

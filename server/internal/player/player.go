@@ -442,7 +442,7 @@ func (p *Player) Update(uri string) error {
 
 // Entry is one row of the local library: a folder or a playable file.
 type Entry struct {
-	Type     string  `json:"type"` // directory | file
+	Type     string  `json:"type"` // directory | file | iso (added by the API layer)
 	Path     string  `json:"path"` // relative to music_directory
 	Name     string  `json:"name"`
 	Title    string  `json:"title,omitempty"`
@@ -453,6 +453,9 @@ type Entry struct {
 	Size int64 `json:"size,omitempty"`
 	// Format is MPD's "rate:bits:channels" for the file, when the database knows it.
 	Format string `json:"format,omitempty"`
+	// Extracted is set by the API layer on disc images (type "iso") that already
+	// have DSF files next to them.
+	Extracted bool `json:"extracted,omitempty"`
 }
 
 // tag reads a key however gompd spelled it: ListInfo lowercases every key,
