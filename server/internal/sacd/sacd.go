@@ -291,7 +291,7 @@ func (e *Extractor) run(tool, abs string) {
 			return nil
 		}
 		if d.IsDir() {
-			_ = os.Chmod(p, 0o2775)
+			_ = os.Chmod(p, 0o775|os.ModeSetgid) // setgid keeps the audio group for files added later
 		} else if strings.EqualFold(filepath.Ext(p), ".dsf") {
 			_ = os.Chmod(p, 0o664)
 		}
