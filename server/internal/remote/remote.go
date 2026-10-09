@@ -190,7 +190,9 @@ func (m *Manager) Scan(d time.Duration) error {
 		defer func() { m.mu.Lock(); m.scanning = false; m.mu.Unlock() }()
 		ctx, cancel := context.WithTimeout(context.Background(), d+10*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "bluetoothctl", "--timeout", fmt.Sprint(int(d.Seconds())), "scan", "on")
+		// stdbuf: bluetoothctl block-buffers its output on a pipe and nothing
+		// would arrive before the scan ends; line-buffered it reports at once
+		cmd := exec.CommandContext(ctx, "stdbuf", "-oL", "-eL", "bluetoothctl", "--timeout", fmt.Sprint(int(d.Seconds())), "scan", "on")
 		out, err := cmd.StdoutPipe()
 		if err != nil {
 			return
@@ -266,7 +268,7 @@ func (m *Manager) Pair(ctx context.Context, mac string) error {
 
 	ctx, cancel := context.WithTimeout(ctx, 75*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bluetoothctl")
+	cmd := exec.CommandContext(ctx, "stdbuf", "-oL", "-eL", "bluetoothctl")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fail(err.Error())
@@ -331,15 +333,24 @@ func (m *Manager) Pair(ctx context.Context, mac string) error {
 	if _, ok := waitFor(10*time.Second, "Agent registered"); !ok {
 		return fail("bluetoothctl did not come up (is the hifid user in the bluetooth group?)")
 	}
-	send("scan on")
-	// wait until BlueZ has (re)discovered this device, at most 15 s
-	if _, ok := waitFor(15*time.Second, mac); !ok {
-		send("scan off")
-		return fail("device " + mac + " not seen while scanning: switch it on and put it in pairing mode, then scan again")
-	}
-	time.Sleep(1500 * time.Millisecond)
+	// The device was listed by a scan moments ago, so BlueZ usually still has
+	// it: pair straight away (the keyboard sleeps ~10 s after advertising).
+	// Only when BlueZ answers "not available" scan for it first.
 	send("pair " + mac)
-	l, ok := waitFor(40*time.Second, "Pairing successful", "Failed to pair", "AlreadyExists", "AuthenticationFailed", "AuthenticationCanceled", "AuthenticationRejected", "ConnectionAttemptFailed", "not available")
+	l, ok := waitFor(6*time.Second, "Pairing successful", "Failed to pair", "AlreadyExists", "Authentication", "ConnectionAttemptFailed", "not available", "Attempting to pair")
+	if !ok || strings.Contains(l, "not available") {
+		send("scan on")
+		if _, seen := waitFor(15*time.Second, mac); !seen {
+			send("scan off")
+			return fail("device " + mac + " not seen: switch it on and put it in pairing mode, then scan again")
+		}
+		time.Sleep(800 * time.Millisecond)
+		send("pair " + mac)
+		l, ok = waitFor(6*time.Second, "Pairing successful", "Failed to pair", "AlreadyExists", "Authentication", "ConnectionAttemptFailed", "not available", "Attempting to pair")
+	}
+	if ok && strings.Contains(l, "Attempting to pair") {
+		l, ok = waitFor(40*time.Second, "Pairing successful", "Failed to pair", "AlreadyExists", "AuthenticationFailed", "AuthenticationCanceled", "AuthenticationRejected", "ConnectionAttemptFailed", "not available")
+	}
 	switch {
 	case ok && (strings.Contains(l, "Pairing successful") || strings.Contains(l, "AlreadyExists")):
 	case strings.Contains(l, "Enter passkey") || strings.Contains(l, "Enter PIN"):

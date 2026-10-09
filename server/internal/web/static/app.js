@@ -1119,7 +1119,7 @@ ncmSearch.oninput = (e) => {
     else if (r.last_key && r.last_key_at !== lastKeyAt) { lastKeyAt = r.last_key_at; status.textContent = `last key: ${r.last_key.replace("_", " ")} at ${new Date(r.last_key_at).toLocaleTimeString()}`; }
     else if (!r.last_key) status.textContent = "";
     clearInterval(timer); timer = null;
-    if (r.scanning || r.pairing) timer = setInterval(refresh, 2000);
+    if (r.scanning || r.pairing) timer = setInterval(refresh, 1000);
   }
   scanBtn.onclick = async () => { scanBtn.disabled = true; await call("/remotes/scan", "POST", {}); refresh(); };
   refresh();
