@@ -1062,7 +1062,12 @@ ncmSearch.oninput = (e) => {
 // ---- Bluetooth remotes ---------------------------------------------------------
 (() => {
   const card = $("remote-card"), list = $("rc-list"), status = $("rc-status"), scanBtn = $("rc-scan");
-  let timer = null, lastKeyAt = "";
+  const body = $("rc-body"), toggle = $("rc-toggle"), title = $("rc-title");
+  let timer = null, lastKeyAt = "", open = false;
+  try { open = localStorage.getItem("rc-open") === "1"; } catch (_) {}
+  const paint = () => { body.hidden = !open; scanBtn.hidden = !open; toggle.textContent = open ? "▾" : "▸"; toggle.setAttribute("aria-expanded", String(open)); };
+  $("rc-head").onclick = (e) => { if (e.target === scanBtn) return; open = !open; try { localStorage.setItem("rc-open", open ? "1" : "0"); } catch (_) {} paint(); if (open) refresh(); };
+  paint();
   const row = (icon, name, sub, btnLabel, onClick, extra) => {
     const li = document.createElement("li");
     li.style.cursor = "default";
@@ -1084,7 +1089,10 @@ ncmSearch.oninput = (e) => {
     if (!r) { card.hidden = true; return; }
     card.hidden = false;
     list.innerHTML = "";
+    const n = r.paired.length, c = r.paired.filter((d) => d.connected).length;
+    title.textContent = "Remote control" + (n ? ` · ${n} paired${c ? ", " + c + " connected" : ""}` : " · none paired");
     if (!r.available) { status.textContent = "Bluetooth adapter not available on the board."; scanBtn.disabled = true; return; }
+    if (!open) { clearInterval(timer); timer = null; return; }
     scanBtn.disabled = r.scanning || !!r.pairing;
     scanBtn.textContent = r.scanning ? "Scanning…" : "Scan for keyboards";
     r.paired.forEach((d) => {

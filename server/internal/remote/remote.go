@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os/exec"
 	"regexp"
@@ -238,8 +239,11 @@ func (m *Manager) Scan(d time.Duration) error {
 	return nil
 }
 
-// Pair pairs, trusts and connects one device. BLE remotes use "just works"
-// pairing, so an agent that needs no input is registered for the attempt.
+// Pair pairs, trusts and connects one device through one interactive
+// bluetoothctl session: scanning stays on so BlueZ keeps the device object,
+// commands are sent only after the prompt is up, and the agent's yes/no
+// questions (passkey confirmation, service authorisation) are answered yes.
+// A remote that insists on a typed passkey cannot be paired this way.
 func (m *Manager) Pair(ctx context.Context, mac string) error {
 	mac = strings.ToUpper(strings.TrimSpace(mac))
 	if !regexp.MustCompile(`^([0-9A-F]{2}:){5}[0-9A-F]{2}$`).MatchString(mac) {
@@ -252,35 +256,109 @@ func (m *Manager) Pair(ctx context.Context, mac string) error {
 	}
 	m.pairing, m.lastErr = mac, ""
 	m.mu.Unlock()
-	defer func() { m.mu.Lock(); m.pairing = ""; m.mu.Unlock() }()
-
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-	// bluetoothctl needs a short scan so BlueZ has the device object, then an
-	// interactive session for the agent + pair + trust + connect sequence.
-	_, _ = btctl(ctx, 12*time.Second, "--timeout", "6", "scan", "on")
-	cmd := exec.CommandContext(ctx, "bluetoothctl")
-	cmd.Stdin = strings.NewReader("agent NoInputNoOutput\ndefault-agent\npair " + mac + "\n")
-	out, _ := cmd.CombinedOutput()
-	o := stripANSI(string(out))
-	switch {
-	case strings.Contains(o, "Pairing successful") || strings.Contains(o, "AlreadyExists"):
-	case strings.Contains(o, "Failed to pair"), strings.Contains(o, "not available"), strings.Contains(o, "AuthenticationFailed"):
-		msg := lastLine(o, "Failed", "not available", "Authentication")
+	fail := func(msg string) error {
 		m.mu.Lock()
-		m.lastErr = "pairing failed: " + msg
+		m.lastErr, m.pairing = msg, ""
 		m.mu.Unlock()
-		return fmt.Errorf("pairing failed: %s", msg)
-	default:
-		m.mu.Lock()
-		m.lastErr = "pairing gave no result (is the device in pairing mode?)"
-		m.mu.Unlock()
-		return fmt.Errorf("pairing gave no result: %s", lastLine(o, "Device", "Pair"))
+		m.log.Warn("remote: pairing failed", "mac", mac, "msg", msg)
+		return fmt.Errorf("%s", msg)
 	}
-	_, _ = btctl(ctx, 10*time.Second, "trust", mac)
-	co, _ := btctl(ctx, 20*time.Second, "connect", mac)
-	if !strings.Contains(co, "Connection successful") && !strings.Contains(co, "Connected: yes") {
-		m.log.Warn("remote: paired but connect did not confirm (it will connect when the device wakes)", "mac", mac, "out", lastLine(co, "Failed", "Connect"))
+
+	ctx, cancel := context.WithTimeout(ctx, 75*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bluetoothctl")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return fail(err.Error())
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fail(err.Error())
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return fail("bluetoothctl: " + err.Error())
+	}
+	defer func() { _, _ = io.WriteString(stdin, "quit\n"); _ = cmd.Wait() }()
+
+	lines := make(chan string, 256)
+	go func() {
+		rd := bufio.NewReader(stdout)
+		for {
+			chunk, err := rd.ReadString('\n')
+			for _, l := range strings.Split(stripANSI(chunk), "\n") {
+				if t := strings.TrimSpace(l); t != "" {
+					lines <- t
+				}
+			}
+			if err != nil {
+				close(lines)
+				return
+			}
+		}
+	}()
+	send := func(c string) { m.log.Debug("remote: btctl >", "cmd", c); _, _ = io.WriteString(stdin, c+"\n") }
+	// waitFor reads until one of the markers appears (or the deadline), answering prompts on the way
+	waitFor := func(d time.Duration, markers ...string) (string, bool) {
+		deadline := time.After(d)
+		for {
+			select {
+			case l, ok := <-lines:
+				if !ok {
+					return "", false
+				}
+				m.log.Debug("remote: btctl <", "line", l)
+				switch {
+				case strings.Contains(l, "(yes/no)"):
+					send("yes")
+				case strings.Contains(l, "Enter passkey") || strings.Contains(l, "Enter PIN"):
+					send("")
+					return l, false
+				}
+				for _, k := range markers {
+					if strings.Contains(l, k) {
+						return l, true
+					}
+				}
+			case <-deadline:
+				return "", false
+			case <-ctx.Done():
+				return "", false
+			}
+		}
+	}
+	// bluetoothctl registers its own agent on start; wait for that before anything else
+	if _, ok := waitFor(10*time.Second, "Agent registered"); !ok {
+		return fail("bluetoothctl did not come up (is the hifid user in the bluetooth group?)")
+	}
+	send("scan on")
+	// wait until BlueZ has (re)discovered this device, at most 15 s
+	if _, ok := waitFor(15*time.Second, mac); !ok {
+		send("scan off")
+		return fail("device " + mac + " not seen while scanning: switch it on and put it in pairing mode, then scan again")
+	}
+	time.Sleep(1500 * time.Millisecond)
+	send("pair " + mac)
+	l, ok := waitFor(40*time.Second, "Pairing successful", "Failed to pair", "AlreadyExists", "AuthenticationFailed", "AuthenticationCanceled", "AuthenticationRejected", "ConnectionAttemptFailed", "not available")
+	switch {
+	case ok && (strings.Contains(l, "Pairing successful") || strings.Contains(l, "AlreadyExists")):
+	case strings.Contains(l, "Enter passkey") || strings.Contains(l, "Enter PIN"):
+		return fail("this device wants a passkey typed on it, which cannot be done from here")
+	case ok:
+		return fail("pairing failed: " + l)
+	default:
+		return fail("pairing gave no answer within 40 s (keep the keyboard awake and in pairing mode)")
+	}
+	send("trust " + mac)
+	waitFor(5*time.Second, "trust succeeded", "Changing")
+	send("connect " + mac)
+	cl, cok := waitFor(20*time.Second, "Connection successful", "Failed to connect")
+	send("scan off")
+	m.mu.Lock()
+	m.pairing = ""
+	m.mu.Unlock()
+	if !cok || strings.Contains(cl, "Failed") {
+		m.log.Warn("remote: paired, connect not confirmed (it will connect when a key is pressed)", "mac", mac, "line", cl)
 	}
 	m.log.Info("remote: paired", "mac", mac)
 	return nil
