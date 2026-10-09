@@ -1065,7 +1065,7 @@ ncmSearch.oninput = (e) => {
   const body = $("rc-body"), toggle = $("rc-toggle"), title = $("rc-title");
   let timer = null, lastKeyAt = "", open = false;
   try { open = localStorage.getItem("rc-open") === "1"; } catch (_) {}
-  const paint = () => { body.hidden = !open; scanBtn.hidden = !open; toggle.textContent = open ? "▾" : "▸"; toggle.setAttribute("aria-expanded", String(open)); };
+  const paint = () => { body.hidden = !open; scanBtn.hidden = !open; toggle.setAttribute("aria-expanded", String(open)); };
   $("rc-head").onclick = (e) => { if (e.target === scanBtn) return; open = !open; try { localStorage.setItem("rc-open", open ? "1" : "0"); } catch (_) {} paint(); if (open) refresh(); };
   paint();
   const row = (icon, name, sub, btnLabel, onClick, extra) => {

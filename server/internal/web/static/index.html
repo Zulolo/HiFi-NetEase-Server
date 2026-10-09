@@ -101,6 +101,8 @@
   #lib-summary { margin:-2px 0 8px; }
   .meta-row { display:flex; justify-content:space-between; align-items:center; color:var(--mut); font-size:12px; margin:6px 0 10px; }
   .ic { width:18px; height:18px; vertical-align:-4px; }
+  .chev { transition: transform .2s; }
+  [aria-expanded="true"] .chev { transform: rotate(180deg); }
   .row > button > .ic { width:22px; height:22px; vertical-align:-5px; }
   .list .meta.err { color:#d9534f; }
   /* long titles scroll back and forth instead of being cut (set up by app.js) */
@@ -134,6 +136,7 @@
   <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M16 5h2v14h-2zM4 5v14l11-7z"/></symbol>
   <symbol id="i-repeat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></g></symbol>
   <symbol id="i-shuffle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></g></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></g></symbol>
 </svg>
 <div class="top">
@@ -176,7 +179,7 @@
 </div>
 
 <div class="card" id="remote-card" hidden>
-  <div class="hdr" id="rc-head" style="cursor:pointer;margin:0"><div class="sub" id="rc-title">Remote control</div><div class="acts"><button class="act" id="rc-scan" hidden>Scan for keyboards</button><button class="act" id="rc-toggle" aria-expanded="false">▸</button></div></div>
+  <div class="hdr" id="rc-head" style="cursor:pointer;margin:0"><div class="sub" id="rc-title">Remote control</div><div class="acts"><button class="act" id="rc-scan" hidden>Scan for keyboards</button><button class="act" id="rc-toggle" aria-expanded="false" aria-label="Show or hide"><svg class="ic chev"><use href="#i-chev"/></svg></button></div></div>
   <div id="rc-body" hidden>
   <div class="sub" id="rc-hint" style="font-size:12px;margin-top:8px">Bluetooth keyboards and media remotes. Pair once; afterwards the remote reconnects by itself when a key is pressed. Play on an empty queue plays everything in Uploads.</div>
   <ul class="list" id="rc-list" style="max-height:none"></ul>
