@@ -1058,3 +1058,62 @@ ncmSearch.oninput = (e) => {
   }).observe(bList, { childList: true });
   window.addEventListener("resize", () => bList.querySelectorAll("li").forEach((li) => { io.unobserve(li); io.observe(li); }));
 })();
+
+// ---- Bluetooth remotes ---------------------------------------------------------
+(() => {
+  const card = $("remote-card"), list = $("rc-list"), status = $("rc-status"), scanBtn = $("rc-scan");
+  let timer = null, lastKeyAt = "";
+  const row = (icon, name, sub, btnLabel, onClick, extra) => {
+    const li = document.createElement("li");
+    li.style.cursor = "default";
+    li.innerHTML = `<div class="ico">${icon}</div>`;
+    const txt = document.createElement("div"); txt.className = "txt";
+    const n = document.createElement("div"); n.className = "n"; n.textContent = name;
+    const s = document.createElement("div"); s.className = "s"; s.textContent = sub;
+    txt.append(n, s); li.appendChild(txt);
+    if (extra) li.appendChild(extra);
+    if (btnLabel) {
+      const b = document.createElement("button"); b.className = "act"; b.textContent = btnLabel;
+      b.onclick = async (e) => { e.stopPropagation(); b.disabled = true; b.textContent = "…"; await onClick(); };
+      li.appendChild(b);
+    }
+    return li;
+  };
+  async function refresh() {
+    const r = await call("/remotes", "GET");
+    if (!r) { card.hidden = true; return; }
+    card.hidden = false;
+    list.innerHTML = "";
+    if (!r.available) { status.textContent = "Bluetooth adapter not available on the board."; scanBtn.disabled = true; return; }
+    scanBtn.disabled = r.scanning || !!r.pairing;
+    scanBtn.textContent = r.scanning ? "Scanning…" : "Scan for keyboards";
+    r.paired.forEach((d) => {
+      const dot = document.createElement("div"); dot.className = "meta";
+      dot.innerHTML = d.connected ? '<span style="color:#54c06e">● connected</span>' : '<span style="color:var(--mut)">○ asleep</span>';
+      list.appendChild(row("⌨️", d.name || d.mac, d.mac + (d.input ? " · keys active" : d.connected ? " · waiting for input device" : " · reconnects on key press"), "Remove", async () => {
+        if (!confirm(`Forget ${d.name || d.mac}? You will need to pair it again.`)) { refresh(); return; }
+        await call("/remotes/" + encodeURIComponent(d.mac), "DELETE"); refresh();
+      }, dot));
+    });
+    r.found.forEach((d) => {
+      list.appendChild(row("📡", d.name || "(unnamed device)", d.mac + (d.icon ? " · " + d.icon : ""), r.pairing ? null : "Pair", async () => {
+        status.textContent = `pairing ${d.name || d.mac}… (keep the keyboard in pairing mode)`;
+        const res = await fetch(API + "/remotes/pair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mac: d.mac }) });
+        const body = await res.json().catch(() => ({}));
+        status.textContent = res.ok ? `paired ${d.name || d.mac}` : ((body.error && body.error.message) || "pairing failed");
+        refresh();
+      }));
+    });
+    if (!r.paired.length && !r.found.length && !r.scanning) status.textContent = "No remote paired. Put the keyboard in pairing mode, then tap Scan.";
+    else if (r.scanning) status.textContent = "scanning for 12 s… devices appear below as they are found";
+    else if (r.pairing) status.textContent = `pairing ${r.pairing}…`;
+    else if (r.error) status.textContent = r.error;
+    else if (r.last_key && r.last_key_at !== lastKeyAt) { lastKeyAt = r.last_key_at; status.textContent = `last key: ${r.last_key.replace("_", " ")} at ${new Date(r.last_key_at).toLocaleTimeString()}`; }
+    else if (!r.last_key) status.textContent = "";
+    clearInterval(timer); timer = null;
+    if (r.scanning || r.pairing) timer = setInterval(refresh, 2000);
+  }
+  scanBtn.onclick = async () => { scanBtn.disabled = true; await call("/remotes/scan", "POST", {}); refresh(); };
+  refresh();
+  setInterval(() => { if (!timer) refresh(); }, 15000);
+})();

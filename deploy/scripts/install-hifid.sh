@@ -85,6 +85,8 @@ for d in /srv/data/hifid /srv/data/incoming; do
   if [ -d "$d" ]; then chgrp audio "$d"; chmod 2775 "$d"; fi
 done
 
+usermod -aG input,bluetooth hifid 2>/dev/null || true
+
 # 6. unit + polkit rule (power-off button in the PWA)
 install -m 0644 "$UNIT" /etc/systemd/system/hifid.service
 if [ -d /etc/polkit-1/rules.d ] && [ -f "$here/../polkit/50-hifid-power.rules" ]; then

@@ -16,6 +16,7 @@ import (
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/remote"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/sacd"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/sysinfo"
 )
@@ -28,6 +29,7 @@ type Server struct {
 	version string
 	ncm     *netease.Client
 	sacd    *sacd.Extractor
+	remote  *remote.Manager
 	dl      *netease.Queue
 
 	// one playlist expansion at a time; a new one cancels the previous
@@ -105,6 +107,10 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("GET /api/v1/system/status", g(s.status))
 	m.HandleFunc("GET /api/v1/system/stats", g(s.systemStats))
 	m.HandleFunc("POST /api/v1/system/poweroff", g(s.powerOff))
+	m.HandleFunc("GET /api/v1/remotes", g(s.remotes))
+	m.HandleFunc("POST /api/v1/remotes/scan", g(s.remoteScan))
+	m.HandleFunc("POST /api/v1/remotes/pair", g(s.remotePair))
+	m.HandleFunc("DELETE /api/v1/remotes/{mac}", g(s.remoteRemove))
 	m.HandleFunc("GET /api/v1/player", g(s.getPlayer))
 	m.HandleFunc("POST /api/v1/player/play", g(s.play))
 	m.HandleFunc("POST /api/v1/player/pause", g(s.simple(func() error { return s.pl.Pause() })))

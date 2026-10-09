@@ -37,6 +37,15 @@ systemd units such as the DAC hot-plug hook.
 | GET | `/system/stats` | board sample for the header strip: CPU %, load, MHz, RAM, SoC temperature, Wi-Fi rate and signal |
 | POST | `/system/poweroff` | admin; halts the board via `systemctl poweroff`. hifid is unprivileged, so the install ships `deploy/polkit/50-hifid-power.rules` allowing only logind's power-off action for the `hifid` user (not reboot). Replies `{"ok":true}` first, runs the command 0.7 s later. |
 
+### Remotes (2026-10-09)
+
+```
+GET    /remotes                 -> {available, adapter, scanning, paired:[{mac,name,connected,trusted,input}], found:[{mac,name,icon}], pairing, last_key, last_key_at, error}
+POST   /remotes/scan            -> 202; discovery runs 12 s in the background, GET shows results
+POST   /remotes/pair {mac}      -> pairs (NoInputNoOutput agent), trusts, connects; 502 with the BlueZ message on failure
+DELETE /remotes/{mac}           -> forgets the device
+```
+
 ## 3. Player (transport)
 
 ```

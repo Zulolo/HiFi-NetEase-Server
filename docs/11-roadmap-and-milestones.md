@@ -209,6 +209,13 @@ Extract / Delete image in the Library tab. The delete guard uses that marker, no
 the folder" (first version did; a test caught it). MPD's archive plugin lists an `.iso` as a
 pseudo-folder; the API hides it. Full-disc extraction: 8 min 24 s, 10 tracks, 2.6 GB.
 
+2026-10-09, Bluetooth remotes: `internal/remote` wraps `bluetoothctl` (scan/pair/trust/connect/
+remove, non-interactive) and reads `/dev/input/event*` of Bluetooth HIDs (uniq = MAC) with a
+24-byte evdev parser; key codes map to player actions, play on an empty queue fills it with
+`local/`. The unit gained `SupplementaryGroups=input bluetooth` (and, restored from the board,
+`AmbientCapabilities=CAP_NET_BIND_SERVICE`, which the repo copy had lost). Paired devices are
+trusted, so they reconnect on their own when powered on.
+
 ## M4 · Output manager and DSD polish · deferred
 
 Deferred 2026-09-25 until a second DAC is in use: one dongle (Comtrue XR768-9039, native DSD

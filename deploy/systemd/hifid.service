@@ -10,6 +10,11 @@ RequiresMountsFor=/srv/music /srv/data
 Type=simple
 User=hifid
 Group=audio
+# input: read /dev/input/event* of paired Bluetooth remotes; bluetooth: talk to BlueZ over D-Bus
+SupplementaryGroups=input bluetooth
+# port 80 as an unprivileged user (NoNewPrivileges blocks setcap-style escalation, so grant it here)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 EnvironmentFile=/etc/hifid/env
 ExecStart=/usr/local/bin/hifid --config /etc/hifid/config.yaml
 Restart=always

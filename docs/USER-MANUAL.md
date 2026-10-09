@@ -175,6 +175,20 @@ tested. When playing DoP through a DAC that scales samples in its USB bridge, ch
 volume makes noise; in that case keep the DAC at 100 % and use the amplifier's knob
 (`gen-mpd-conf.sh --volume none` makes this permanent).
 
+### 5.3 Bluetooth remote or mini keyboard
+
+Any Bluetooth (BLE) keyboard or media remote with play/pause, next, previous, volume and
+arrow keys can drive the player without a phone. In the web app, scroll to **Remote control**,
+put the keyboard in pairing mode, tap **Scan for keyboards**, then **Pair** on the device. It
+is stored as trusted in BlueZ, so after that it reconnects by itself whenever it is switched
+on and a key is pressed; nothing needs to be done on the page again. **Remove** forgets it
+(do this before pairing it with another computer).
+
+Keys: play/pause (on an empty queue: plays everything in Uploads), next, previous, stop,
+volume ± (3 % steps, repeats while held), left/right arrows seek 10 s, mute. The card shows
+which remote is connected and the last key received. Requirements: `bluez` on the board and
+the `hifid` user in the `input` and `bluetooth` groups (the installer does both).
+
 ## 6. Add music
 
 ### 6.1 Samba share (Windows Explorer)

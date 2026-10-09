@@ -19,6 +19,7 @@ import (
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/config"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/netease"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/player"
+	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/remote"
 	"github.com/Zulolo/HiFi-NetEase-Server/server/internal/web"
 )
 
@@ -110,6 +111,14 @@ func main() {
 			}
 		}
 	}
+
+	// Bluetooth remotes / keyboards (optional: needs bluetoothctl and the
+	// input + bluetooth groups; the manager just stays idle without them).
+	rm := remote.New(log, srv.RemoteAction)
+	srv.SetRemote(rm)
+	rmCtx, stopRM := context.WithCancel(context.Background())
+	defer stopRM()
+	go rm.Run(rmCtx)
 
 	// Fan MPD idle events out to WebSocket clients. A missing MPD at start-up
 	// is not fatal: hifid must serve status so the UI can show the problem.
