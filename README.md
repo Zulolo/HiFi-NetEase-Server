@@ -1,4 +1,4 @@
-﻿# HiFi-NetEase-Server
+# HiFi-NetEase-Server
 
 **A headless HiFi music server for a small Linux board (Orange Pi, Raspberry Pi, any Debian SBC)
 that plays 缃戞槗浜戦煶涔?/ NetEase Cloud Music and your own FLAC/DSD files bit-perfect through a
@@ -60,16 +60,20 @@ flowchart LR
         PWA["Web app / PWA<br/>http://board.local/"]
         MPDC["Any MPD client<br/>(M.A.L.P., myMPD)"]
     end
+    BLE["Bluetooth remote /<br/>BLE mini keyboard"]
     subgraph Board["Linux SBC (Debian, headless)"]
-        subgraph hifid["hifid 路 Go, one binary, unprivileged"]
+        subgraph hifid["hifid · Go, one binary, unprivileged"]
             API["REST + WebSocket API"]
-            NCM["NetEase adapter<br/>login 路 catalogue 路 quality ladders<br/>download list 路 tagging"]
+            NCM["NetEase adapter<br/>login · catalogue · quality ladders<br/>download list · tagging"]
             PROXY["Stream proxy<br/>/stream/ncm/{id}"]
+            RC["Remote manager<br/>pair via BlueZ · read keys"]
+            SACD["SACD extractor<br/>.iso → DSF"]
             SYS["Board telemetry"]
         end
-        MPD["MPD 0.24<br/>decode 路 queue 路 library DB<br/>ALSA hw: bit-perfect"]
+        BLUEZ["BlueZ + kernel HID<br/>/dev/input/event*"]
+        MPD["MPD 0.24<br/>decode · queue · library DB<br/>ALSA hw: bit-perfect"]
         SMB["Samba share"]
-        DISK[("USB disk<br/>local/ 路 netease/ 路 playlists/")]
+        DISK[("USB disk<br/>local/ · netease/ · playlists/")]
         DAC["USB DAC<br/>(UAC2, native DSD / DoP)"]
     end
     NET["NetEase API + CDN"]
@@ -77,12 +81,16 @@ flowchart LR
 
     PWA <-->|HTTP + WS| API
     MPDC <-->|:6600| MPD
-    API --> NCM & SYS
+    BLE <-.->|Bluetooth LE| BLUEZ
+    BLUEZ -->|key events| RC
+    RC -->|play · next · volume · seek| API
+    API --> NCM & SYS & SACD
     API <-->|MPD protocol| MPD
     MPD -->|GET| PROXY
     PROXY <-->|HTTPS| NET
     NCM <-->|HTTPS| NET
     NCM -->|downloads| DISK
+    SACD -->|DSF tracks| DISK
     SMB -->|uploads| DISK
     MPD --> DISK
     MPD --> DAC --> SPK

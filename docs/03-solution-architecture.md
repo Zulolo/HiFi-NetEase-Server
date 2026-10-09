@@ -236,15 +236,19 @@ flowchart LR
         PWA["PWA at http://&lt;hostname&gt;.local/<br/>(embedded in hifid)"]
         MALP["myMPD :8080 / M.A.L.P.<br/>(optional, MPD protocol)"]
     end
+    BLE["BLE mini keyboard /<br/>media remote"]
     subgraph Board["Orange Pi Zero 3"]
         subgraph hifid["hifid (Go, user hifid, :80)"]
             API["api: REST + WebSocket"]
             PL["player: MPD adapter<br/>(gompd, unix socket)"]
             NCM["netease: session, catalogue,<br/>quality ladders, downloads"]
             PROXY["netease/proxy:<br/>/stream/ncm/{id}"]
+            RC["remote: bluetoothctl pairing,<br/>evdev key reader"]
+            SACD["sacd: sacd_extract runner"]
             WEB["web: embedded PWA"]
             SYS["sysinfo: /proc, /sys"]
         end
+        BLUEZ["bluetoothd + kernel HID<br/>/dev/input/eventN"]
         MPD["MPD 0.24 (user mpd)<br/>decode, queue, library DB,<br/>ALSA hw: output"]
         SMB["smbd: share 'music'"]
         DISK[("USB disk /srv/music<br/>local/  netease/  playlists/<br/>/srv/data/{mpd,hifid}")]
@@ -254,16 +258,24 @@ flowchart LR
 
     PWA <-->|HTTP + WS| API
     MALP <-->|:6600| MPD
-    API --> PL & NCM & SYS
+    BLE <-.->|Bluetooth LE, trusted,<br/>reconnects on key press| BLUEZ
+    BLUEZ -->|key events| RC --> PL
+    API --> PL & NCM & SYS & SACD
     PL <-->|MPD protocol| MPD
     MPD -->|GET, loopback| PROXY
     PROXY <-->|HTTPS| NET
     NCM <-->|HTTPS| NET
     NCM -->|writes downloads| DISK
+    SACD -->|DSF| DISK
     MPD -->|reads files| DISK
     SMB -->|writes uploads| DISK
     MPD --> DAC
 ```
+
+Two later additions sit beside the three rules without bending them: the **remote** package
+reads key events of paired Bluetooth HIDs and turns them into the same player calls the API
+makes, and the **sacd** package runs the external extractor that turns an SACD image into DSF
+files on the disk, which MPD then indexes like any upload.
 
 Three rules make the whole thing simple:
 
