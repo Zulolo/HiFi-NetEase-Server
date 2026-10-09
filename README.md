@@ -7,8 +7,8 @@ USB DAC into any speaker or amplifier, controlled from your phone.**
 Keywords, so you can tell whether you are in the right place: NetEase Cloud Music · 网易云音乐 ·
 Linux 播放器 · headless music server · Orange Pi Zero 3 · Raspberry Pi · Armbian · Debian ·
 arm64 · riscv64 · MPD · bit-perfect · USB DAC dongle · ES9039Q2M · ES9038 · CS43131 · native DSD ·
-DoP · DSD256 · 24/192 · Hi-Res · 无损 · 超清母带 (jymaster) · FLAC · Samba · PWA remote control ·
-Go.
+DoP · DSD256 · 24/192 · Hi-Res · 无损 · 超清母带 (jymaster) · FLAC · SACD ISO · Samba · PWA remote
+control · Bluetooth remote · BLE keyboard · Go.
 
 | Phone | Desktop browser |
 |---|---|
@@ -29,6 +29,9 @@ Go.
   phone shows the format the DAC really receives ("PCM 24/192k · S24_LE", "DSD256 native").
 - **Controlled from a phone** through a web app served by the board itself (installable as a
   PWA), plus any MPD client (M.A.L.P., myMPD, Cantata) against the same queue.
+- **Or from a Bluetooth remote.** Pair any BLE mini keyboard or media remote once, from the web
+  app; afterwards it reconnects by itself when switched on. Play/pause, next, previous, volume,
+  seek with the arrows; play on an empty queue starts the local library. No phone needed.
 - **Runs unattended.** One Go binary and MPD as systemd services, auto-start on boot, Wi-Fi
   watchdog, board telemetry in the header (CPU, RAM, SoC temperature, Wi-Fi), a power-off button.
 - **Small.** About 20 MB RSS for the service, 65 MB for MPD, idle CPU under 2 % on a
@@ -110,6 +113,7 @@ enable. The reference build is one example:
 | Speaker / amp | Marshall Acton IV over 3.5 mm AUX | Anything with a line input; the dongle's headphone output drives it at 100 % volume |
 | Music storage | 512 GB microSD in a USB reader, ext4 | USB flash drive or SSD. Plug it into the board's own USB port; a card reader on an expansion header fell back to USB 1.1 |
 | Network | 2.4 GHz Wi-Fi, ~5 Mbit/s usable | Ethernet or 5 GHz Wi-Fi removes the streaming ceiling; the design is offline-first so weak Wi-Fi only slows downloads |
+| Remote | A 7-key BLE mini keyboard (play/pause, prev, next, vol ±, ← →) | Any Bluetooth keyboard or media remote the kernel sees as a HID device; the board's own Bluetooth (UWE5622 on the Zero 3) or a USB dongle |
 | NetEase account | SVIP (masters) | Any account: the quality ladder follows what the account is granted (standard → 320k → lossless → Hi-Res → master) |
 
 ## Quick start
@@ -154,7 +158,8 @@ tools/         bench helpers (DSD test-file generator, measurement scripts)
 
 Daily-use complete (September 2026): NetEase login, playlists, liked songs, daily picks, search,
 live streaming, download list with pause/resume and stall recovery, tagging, Samba uploads,
-folder/artist/album browsing, output switching, telemetry, power-off, backup script. Open:
+folder/artist/album browsing, output switching, telemetry, power-off, backup script, SACD ISO
+extraction, Bluetooth remote control. Open:
 long soak test, per-DAC output manager for multi-DAC setups, native Android app (optional).
 
 ## Contributing: add your board or DAC

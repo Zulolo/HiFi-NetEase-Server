@@ -287,6 +287,7 @@ Three rules make the whole thing simple:
 | `smbd` | | 445 | share `music` = `/srv/music` (Explorer, Y: drive) |
 | `avahi-daemon` | | 5353/udp | `<hostname>.local` |
 | `wifi-watchdog.timer` | root | | reconnects wlan0 if the gateway stops answering |
+| `bluetooth.service` | | | BlueZ; `hifid` (groups `bluetooth`, `input`) pairs remotes through `bluetoothctl` and reads their `/dev/input/event*` |
 
 hifid runs under `NoNewPrivileges` + `ProtectSystem=strict`; it can write only `/srv/music`,
 `/srv/data/hifid`, `/srv/data/incoming` and `/run/hifid`. Two narrow exceptions cover the
