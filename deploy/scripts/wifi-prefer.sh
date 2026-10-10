@@ -13,6 +13,7 @@
 set -u
 IFACE="${1:-wlan0}"
 STATE=/run/wifi-prefer.last-fail
+BUSY_KBPS=${BUSY_KBPS:-100}   # skip the switch while more than this flows (kB/s)
 log(){ logger -t wifi-prefer -- "$*"; echo "wifi-prefer: $*"; }
 
 active=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | awk -F: -v i="$IFACE" '$NF==i{sub(":"i"$",""); print; exit}')
@@ -29,7 +30,7 @@ if [ -f "$STATE" ] && [ $(( $(date +%s) - $(cat "$STATE") )) -lt 1800 ]; then ex
 r1=$(cat /sys/class/net/$IFACE/statistics/rx_bytes); t1=$(cat /sys/class/net/$IFACE/statistics/tx_bytes); sleep 3
 r2=$(cat /sys/class/net/$IFACE/statistics/rx_bytes); t2=$(cat /sys/class/net/$IFACE/statistics/tx_bytes)
 rate=$(( (r2 - r1 + t2 - t1) / 3 / 1024 ))
-if [ "$rate" -gt 100 ]; then log "on '$active', prefer '$best_name', but link is busy (${rate} kB/s); later"; exit 0; fi
+if [ "$rate" -gt "$BUSY_KBPS" ]; then log "on '$active', prefer '$best_name', but link is busy (${rate} kB/s); later"; exit 0; fi
 if command -v mpc >/dev/null && mpc status 2>/dev/null | grep -q '^\[playing\]' && mpc -f '%file%' current 2>/dev/null | grep -q '^http'; then
   log "on '$active', prefer '$best_name', but a stream is playing; later"; exit 0
 fi
