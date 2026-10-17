@@ -20,12 +20,10 @@
   .seek { padding:8px 0 4px; margin:2px 0 0; cursor:pointer; }
   .seek .bar { margin:0; }
   .opts .act { flex:1 1 0; padding:9px 10px; font-size:14px; }
-  .sleeprow { display:flex; align-items:center; gap:10px; }
-  .sleeprow .ic { color:var(--mut); flex:0 0 auto; }
-  .sleeprow select { flex:0 0 auto; width:auto; min-width:96px; padding:7px 10px; font-size:14px; }
-  .sleeprow .sub { margin:0; }
-  .sleeprow #sleep-left { color:var(--acc); margin-left:auto; font-variant-numeric:tabular-nums; }
-  .sleeprow.armed .ic { color:var(--acc); }
+  .opts .sleep { display:flex; align-items:center; justify-content:center; gap:4px; padding:0 6px 0 10px; cursor:pointer; }
+  .opts .sleep select { flex:0 1 auto; width:auto; min-width:0; background:transparent; border:0; color:inherit; font:inherit; padding:9px 0; text-align:center; }
+  .opts .sleep.on { color:var(--acc); background:#1f3242; }
+  @media (max-width: 400px) { .opts .act { padding:9px 6px; font-size:13px; } }
   .opts .act.on { color:var(--acc); background:#1f3242; }
   .sys { display:flex; flex-wrap:wrap; gap:6px; font-variant-numeric:tabular-nums; }
   .tile { flex:0 0 auto; background:var(--card); border-radius:8px; padding:5px 9px 4px; display:grid;
@@ -169,17 +167,12 @@
 <div class="card row opts">
   <button class="act" id="repeat" aria-pressed="false"><svg class="ic"><use href="#i-repeat"/></svg> Repeat</button>
   <button class="act" id="random" aria-pressed="false"><svg class="ic"><use href="#i-shuffle"/></svg> Shuffle</button>
-</div>
-<div class="card sleeprow">
-  <svg class="ic"><use href="#i-moon"/></svg>
-  <span class="sub">Sleep timer</span>
-  <select id="sleep" aria-label="Sleep timer">
-    <option value="0">Off</option>
+  <label class="act sleep" id="sleep-wrap" title="Sleep timer: pause playback after this long"><svg class="ic"><use href="#i-moon"/></svg><select id="sleep" aria-label="Sleep timer">
+    <option value="0">Sleep</option>
     <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option>
     <option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option>
     <option value="60">1 h</option><option value="90">1.5 h</option><option value="120">2 h</option>
-  </select>
-  <span class="sub" id="sleep-left"></span>
+  </select></label>
 </div>
 
 <div class="card">

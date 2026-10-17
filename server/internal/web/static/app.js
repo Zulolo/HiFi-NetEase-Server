@@ -64,16 +64,22 @@ function render(st) {
 }
 
 // ---- sleep timer ---------------------------------------------------------------
-const sleepSel = $("sleep"), sleepLeft = $("sleep-left"), sleepRow = document.querySelector(".sleeprow");
+const sleepSel = $("sleep"), sleepWrap = $("sleep-wrap");
+const sleepLabels = [...sleepSel.options].map((o) => o.textContent);
+const restoreSleepLabels = () => [...sleepSel.options].forEach((o, i) => (o.textContent = sleepLabels[i]));
 let sleepEndsAt = null, sleepTick = null;
 function renderSleep(st) {
   const ends = st.sleep_ends_at ? new Date(st.sleep_ends_at) : null;
   sleepEndsAt = ends && ends > new Date() ? ends : null;
-  sleepRow.classList.toggle("armed", !!sleepEndsAt);
-  if (!sleepEndsAt) { sleepLeft.textContent = ""; if (sleepSel.value !== "0" && document.activeElement !== sleepSel) sleepSel.value = "0"; clearInterval(sleepTick); sleepTick = null; return; }
+  sleepWrap.classList.toggle("on", !!sleepEndsAt);
+  if (!sleepEndsAt) { restoreSleepLabels(); if (sleepSel.value !== "0" && document.activeElement !== sleepSel) sleepSel.value = "0"; clearInterval(sleepTick); sleepTick = null; return; }
+  // the chosen option shows the time left, so the button reads "☾ 23 min"
   const paint = () => {
     const s = Math.max(0, Math.round((sleepEndsAt - Date.now()) / 1000));
-    sleepLeft.textContent = s >= 3600 ? `pauses in ${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `pauses in ${Math.round(s / 60)} min` : `pauses in ${s} s`;
+    const left = s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `${Math.round(s / 60)} min` : `${s} s`;
+    restoreSleepLabels();
+    const o = sleepSel.selectedOptions[0];
+    if (o && o.value !== "0") o.textContent = left + " ⏱";
   };
   paint();
   if (!sleepTick) sleepTick = setInterval(paint, 5000);
