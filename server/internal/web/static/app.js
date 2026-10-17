@@ -59,8 +59,26 @@ function render(st) {
   $("random").classList.toggle("on", !!st.random);
   $("random").setAttribute("aria-pressed", String(!!st.random));
   lastDur = dur;
+  renderSleep(st);
   markPlaying(st);
 }
+
+// ---- sleep timer ---------------------------------------------------------------
+const sleepSel = $("sleep"), sleepLeft = $("sleep-left"), sleepRow = document.querySelector(".sleeprow");
+let sleepEndsAt = null, sleepTick = null;
+function renderSleep(st) {
+  const ends = st.sleep_ends_at ? new Date(st.sleep_ends_at) : null;
+  sleepEndsAt = ends && ends > new Date() ? ends : null;
+  sleepRow.classList.toggle("armed", !!sleepEndsAt);
+  if (!sleepEndsAt) { sleepLeft.textContent = ""; if (sleepSel.value !== "0" && document.activeElement !== sleepSel) sleepSel.value = "0"; clearInterval(sleepTick); sleepTick = null; return; }
+  const paint = () => {
+    const s = Math.max(0, Math.round((sleepEndsAt - Date.now()) / 1000));
+    sleepLeft.textContent = s >= 3600 ? `pauses in ${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `pauses in ${Math.round(s / 60)} min` : `pauses in ${s} s`;
+  };
+  paint();
+  if (!sleepTick) sleepTick = setInterval(paint, 5000);
+}
+sleepSel.onchange = async (e) => render(await call("/player/sleep", "PUT", { minutes: Number(e.target.value) }));
 let lastDur = 0;
 
 async function refresh() {
@@ -816,7 +834,9 @@ function markPlaying(st) {
   let hit = null;
   bList.querySelectorAll("li").forEach((li) => {
     const on = (id && li.dataset.ncm === id) || (path && li.dataset.path === path);
+    const was = li.classList.contains("playing");
     li.classList.toggle("playing", !!on);
+    if (was !== !!on && window.remeasureRow) window.remeasureRow(li);
     if (on) hit = li;
   });
   const key = hit ? (id || path) : "";
@@ -1047,6 +1067,7 @@ ncmSearch.oninput = (e) => {
       n.classList.add("mq");
     } else n.classList.remove("mq");
   };
+  window.remeasureRow = setup;
   const io = new IntersectionObserver((entries) => {
     entries.forEach((en) => {
       if (en.isIntersecting) setup(en.target);

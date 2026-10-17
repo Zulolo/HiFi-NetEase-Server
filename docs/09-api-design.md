@@ -69,6 +69,7 @@ POST /player/stop
 POST /player/next  ·  POST /player/prev
 POST /player/seek        {"seconds": 120.0} | {"delta": -10}
 PUT  /player/options     {"repeat":true,"random":false,"single":false,"consume":false}
+PUT  /player/sleep       {"minutes": 30}   // 0 = off, else 5..120; GET /player then carries sleep_ends_at (RFC 3339) until it fires and pauses
 PUT  /player/volume      {"volume": 40} | {"delta": +5} | {"mute": true}
 ```
 

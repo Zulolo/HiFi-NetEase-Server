@@ -30,6 +30,10 @@ type Server struct {
 	ncm     *netease.Client
 	sacd    *sacd.Extractor
 	remote  *remote.Manager
+
+	sleepMu    sync.Mutex
+	sleepEnd   time.Time
+	sleepTimer *time.Timer
 	dl      *netease.Queue
 
 	// one playlist expansion at a time; a new one cancels the previous
@@ -121,6 +125,7 @@ func (s *Server) Routes(ui http.Handler) http.Handler {
 	m.HandleFunc("POST /api/v1/player/jump", g(s.jump))
 	m.HandleFunc("PUT /api/v1/player/volume", g(s.volume))
 	m.HandleFunc("PUT /api/v1/player/options", g(s.options))
+	m.HandleFunc("PUT /api/v1/player/sleep", g(s.sleep))
 
 	m.HandleFunc("GET /api/v1/queue", g(s.getQueue))
 	m.HandleFunc("POST /api/v1/queue", g(s.addQueue))
@@ -183,7 +188,7 @@ func (s *Server) respondState(w http.ResponseWriter) {
 		writeErr(w, http.StatusBadGateway, "mpd_unavailable", err.Error())
 		return
 	}
-	s.enrichSong(&st)
+	s.decorate(&st)
 	writeJSON(w, http.StatusOK, st)
 }
 
@@ -373,7 +378,7 @@ func (s *Server) Broadcast(subsystem string) {
 	st, err := s.pl.Status()
 	payload := map[string]any{"type": subsystem}
 	if err == nil {
-		s.enrichSong(&st)
+		s.decorate(&st)
 		payload["state"] = st
 	}
 	b, _ := json.Marshal(payload)

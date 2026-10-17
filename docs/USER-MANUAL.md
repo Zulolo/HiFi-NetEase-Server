@@ -118,7 +118,9 @@ printed by the installer if you set auth to `token`.
 
 - **Now playing** shows the delivered format (for example "PCM 24/192k · S24_LE", or a DSD
   rate for native DSD). Tap the progress bar to seek. Repeat and Shuffle sit under the
-  transport row. Volume has a slider plus − / + for 1 % steps.
+  transport row. Volume has a slider plus − / + for 1 % steps. **Sleep timer** under them:
+  pick 5 min to 2 h and playback pauses when the time is up (the timer runs on the board, so
+  the phone can go to sleep); the row shows the remaining time and Off cancels it.
 - **NetEase tab**: your playlists, ★ liked songs, and a "Daily picks" row (每日推荐). Tap a
   playlist to open it, ▶ on a row plays the whole list. Inside a list, tap a track to play
   from there; the arrow on the right adds it to the download list; a green tick means a copy

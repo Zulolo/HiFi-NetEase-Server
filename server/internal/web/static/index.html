@@ -20,6 +20,12 @@
   .seek { padding:8px 0 4px; margin:2px 0 0; cursor:pointer; }
   .seek .bar { margin:0; }
   .opts .act { flex:1 1 0; padding:9px 10px; font-size:14px; }
+  .sleeprow { display:flex; align-items:center; gap:10px; }
+  .sleeprow .ic { color:var(--mut); flex:0 0 auto; }
+  .sleeprow select { flex:0 0 auto; width:auto; min-width:96px; padding:7px 10px; font-size:14px; }
+  .sleeprow .sub { margin:0; }
+  .sleeprow #sleep-left { color:var(--acc); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .sleeprow.armed .ic { color:var(--acc); }
   .opts .act.on { color:var(--acc); background:#1f3242; }
   .sys { display:flex; flex-wrap:wrap; gap:6px; font-variant-numeric:tabular-nums; }
   .tile { flex:0 0 auto; background:var(--card); border-radius:8px; padding:5px 9px 4px; display:grid;
@@ -107,8 +113,8 @@
   .list .meta.err { color:#d9534f; }
   /* long titles scroll back and forth instead of being cut (set up by app.js) */
   .list .n.mq { text-overflow:clip; }
-  .list .n .mqi { display:inline-block; }
-  .list .n.mq .mqi { animation: mq var(--dur, 8s) ease-in-out infinite alternate; }
+  .list .n .mqi { display:inline; }
+  .list .n.mq .mqi { display:inline-block; animation: mq var(--dur, 8s) ease-in-out infinite alternate; }
   @keyframes mq { 0%, 18% { transform:translateX(0); } 82%, 100% { transform:translateX(var(--shift, 0)); } }
   @media (prefers-reduced-motion: reduce) { .list .n.mq .mqi { animation:none; } }
   /* phones: file details go under the title so the title gets the full width */
@@ -137,6 +143,7 @@
   <symbol id="i-repeat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></g></symbol>
   <symbol id="i-shuffle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></g></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></g></symbol>
 </svg>
 <div class="top">
@@ -162,6 +169,17 @@
 <div class="card row opts">
   <button class="act" id="repeat" aria-pressed="false"><svg class="ic"><use href="#i-repeat"/></svg> Repeat</button>
   <button class="act" id="random" aria-pressed="false"><svg class="ic"><use href="#i-shuffle"/></svg> Shuffle</button>
+</div>
+<div class="card sleeprow">
+  <svg class="ic"><use href="#i-moon"/></svg>
+  <span class="sub">Sleep timer</span>
+  <select id="sleep" aria-label="Sleep timer">
+    <option value="0">Off</option>
+    <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option>
+    <option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option>
+    <option value="60">1 h</option><option value="90">1.5 h</option><option value="120">2 h</option>
+  </select>
+  <span class="sub" id="sleep-left"></span>
 </div>
 
 <div class="card">

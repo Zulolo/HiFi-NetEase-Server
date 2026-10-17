@@ -122,6 +122,8 @@ type Status struct {
 	QueueLen  int     `json:"queue_length"`
 	Song      *Song   `json:"song"`
 	Format    *Format `json:"format"`
+	// SleepEndsAt (RFC 3339, UTC) is set by the API layer while a sleep timer runs.
+	SleepEndsAt string `json:"sleep_ends_at,omitempty"`
 }
 
 func atoi(s string) int     { n, _ := strconv.Atoi(s); return n }
